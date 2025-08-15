@@ -6,8 +6,12 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pooloride",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "extra": {
+      "supabaseUrl": "https://mgveipsrjzkdjvjlwbvz.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ndmVpcHNyanprZGp2amx3YnZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3NTc4OTgsImV4cCI6MjA3MDMzMzg5OH0.Q7TXGBlxBnsh_yPHh7Z4FCDlrxeDvsHQ66HyobvfG_M"
+    },
     "ios": {
       "supportsTablet": true
     },
