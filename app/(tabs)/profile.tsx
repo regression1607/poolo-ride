@@ -7,23 +7,28 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/src/context/AuthContext';
+import { useTheme } from '@/src/context/ThemeContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const colorScheme = useColorScheme();
+  const { themeMode, setThemeMode, isDark } = useTheme();
   const router = useRouter();
-  const [isDarkMode, setIsDarkMode] = useState(colorScheme === 'dark');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   
-  // Mock user profile data
+  // Use real user data from authentication
   const profile = {
     name: user?.name || 'User',
     email: user?.email || 'user@example.com',
-    phone: '+91 9876543210',
-    totalRides: 15,
-    rating: 4.8,
+    phone: '+91 9876543210', // This could be added to user registration
+    totalRides: 0, // This would come from database
+    rating: 0, // This would come from database
+  };
+
+  const handleThemeToggle = (value: boolean) => {
+    // Toggle between light and dark mode (ignoring system for simplicity)
+    setThemeMode(value ? 'dark' : 'light');
   };
 
   const handleSignOut = async () => {
@@ -76,8 +81,8 @@ export default function ProfileScreen() {
             <ThemedView style={styles.settingItem}>
               <ThemedText>Dark Mode</ThemedText>
               <Switch
-                value={isDarkMode}
-                onValueChange={(value) => setIsDarkMode(value)}
+                value={isDark}
+                onValueChange={handleThemeToggle}
                 trackColor={{ false: '#767577', true: '#0a7ea4' }}
                 thumbColor="#f4f3f4"
               />

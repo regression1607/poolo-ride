@@ -23,7 +23,7 @@ export default function PublishScreen() {
   const [showDropoffTimePicker, setShowDropoffTimePicker] = useState(false);
   const [personCount, setPersonCount] = useState(1);
 
-  const formatDate = (date) => {
+  const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -31,7 +31,7 @@ export default function PublishScreen() {
     });
   };
 
-  const formatTime = (time) => {
+  const formatTime = (time: Date) => {
     return time.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',

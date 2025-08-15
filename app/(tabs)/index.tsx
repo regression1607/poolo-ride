@@ -17,45 +17,8 @@ export default function SearchScreen() {
 
   const handleSearch = () => {
     console.log('Searching for rides:', { fromLocation, toLocation, personCount, rideMode });
-    // Implement search functionality
+    // TODO: Implement actual search functionality with database
   };
-
-  // Mock data for available rides
-  const availableRides = [
-    {
-      id: '1',
-      driver: 'John Doe',
-      from: 'Faridabad',
-      to: 'Noida',
-      date: '2023-08-15',
-      time: '09:00 AM',
-      price: '₹200',
-      mode: 'Car',
-      seats: 3,
-    },
-    {
-      id: '2',
-      driver: 'Jane Smith',
-      from: 'Gurgaon',
-      to: 'Delhi',
-      date: '2023-08-15',
-      time: '10:30 AM',
-      price: '₹180',
-      mode: 'Cab',
-      seats: 4,
-    },
-    {
-      id: '3',
-      driver: 'Mike Johnson',
-      from: 'Faridabad',
-      to: 'Noida',
-      date: '2023-08-15',
-      time: '12:00 PM',
-      price: '₹50',
-      mode: 'Bike',
-      seats: 1,
-    },
-  ];
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -140,35 +103,13 @@ export default function SearchScreen() {
 
           <ThemedView style={styles.resultsContainer}>
             <ThemedText type="title">Available Rides</ThemedText>
-
-            {availableRides.length > 0 ? (
-              availableRides.map((ride) => (
-                <TouchableOpacity key={ride.id} style={styles.rideCard}>
-                  <View style={styles.rideHeader}>
-                    <ThemedText type="subtitle">{ride.from} to {ride.to}</ThemedText>
-                    <ThemedText style={styles.price}>{ride.price}</ThemedText>
-                  </View>
-                  
-                  <View style={styles.rideDetails}>
-                    <ThemedText>Date: {ride.date}</ThemedText>
-                    <ThemedText>Time: {ride.time}</ThemedText>
-                    <ThemedText>Mode: {ride.mode}</ThemedText>
-                    <ThemedText>Available Seats: {ride.seats}</ThemedText>
-                  </View>
-                  
-                  <View style={styles.rideFooter}>
-                    <ThemedText>Driver: {ride.driver}</ThemedText>
-                    <TouchableOpacity style={styles.requestButton}>
-                      <ThemedText style={styles.requestButtonText}>Request</ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <ThemedView style={styles.noRidesContainer}>
-                <ThemedText>No rides found for your search criteria.</ThemedText>
-              </ThemedView>
-            )}
+            
+            <ThemedView style={styles.noRidesContainer}>
+              <ThemedText>Search for rides to see available options.</ThemedText>
+              <ThemedText style={styles.helpText}>
+                Enter your departure and destination locations above and tap "Search Rides" to find available rides.
+              </ThemedText>
+            </ThemedView>
           </ThemedView>
         </ThemedView>
       </ScrollView>
@@ -247,51 +188,16 @@ const styles = StyleSheet.create({
   resultsContainer: {
     gap: 16,
   },
-  rideCard: {
-    borderRadius: 8,
-    padding: 16,
-    marginTop: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  rideHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  price: {
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  rideDetails: {
-    marginBottom: 12,
-  },
-  rideFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  requestButton: {
-    backgroundColor: '#0a7ea4',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  requestButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
   noRidesContainer: {
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 20,
+  },
+  helpText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    opacity: 0.7,
   },
 });
