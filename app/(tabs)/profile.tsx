@@ -4,12 +4,11 @@ import { useState } from 'react';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText, ThemedView } from '@/src/components';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/Colors';
+import { DesignTokens } from '@/src/design/tokens';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
@@ -50,8 +49,11 @@ export default function ProfileScreen() {
             <ThemedView style={styles.profileHeader}>
               <ThemedView style={styles.avatarContainer}>
                 <Image
-                  source={{ uri: 'https://i.pravatar.cc/300' }}
-                  style={styles.avatar}
+                  source={{ uri: DesignTokens.images.avatar }}
+                  style={[
+                    styles.avatar,
+                    { backgroundColor: isDark ? DesignTokens.colors.backgroundDark : DesignTokens.colors.background }
+                  ]}
                 />
               </ThemedView>
               <ThemedView style={styles.profileInfo}>
@@ -133,35 +135,31 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: DesignTokens.spacing.md,
   },
   header: {
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: DesignTokens.spacing.lg,
+    marginBottom: DesignTokens.spacing.lg,
     alignItems: 'center',
   },
   profileCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: DesignTokens.borderRadius.lg,
+    padding: DesignTokens.spacing.md,
+    marginBottom: DesignTokens.spacing.lg,
+    ...DesignTokens.shadows.md,
+    backgroundColor: DesignTokens.colors.surface,
   },
   profileHeader: {
     flexDirection: 'row',
-    marginBottom: 15,
+    marginBottom: DesignTokens.spacing.sm,
   },
   avatarContainer: {
-    marginRight: 20,
+    marginRight: DesignTokens.spacing.md,
   },
   avatar: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: '#ccc',
+    borderRadius: DesignTokens.borderRadius.round,
   },
   profileInfo: {
     flex: 1,
@@ -169,68 +167,66 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    marginTop: 10,
+    marginTop: DesignTokens.spacing.sm,
   },
   stat: {
-    marginRight: 20,
+    marginRight: DesignTokens.spacing.md,
   },
   editProfileButton: {
-    backgroundColor: '#0a7ea4',
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: DesignTokens.colors.primary,
+    paddingVertical: DesignTokens.spacing.sm + 4,
+    borderRadius: DesignTokens.borderRadius.md,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: DesignTokens.spacing.sm,
   },
   buttonText: {
-    color: 'white',
-    fontSize: 16,
+    color: DesignTokens.colors.textInverse,
+    fontSize: DesignTokens.typography.fontSizes.base,
     fontWeight: 'bold',
   },
   sectionContainer: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: DesignTokens.borderRadius.lg,
+    padding: DesignTokens.spacing.md,
+    marginBottom: DesignTokens.spacing.lg,
+    ...DesignTokens.shadows.md,
+    backgroundColor: DesignTokens.colors.surface,
   },
   sectionTitle: {
-    marginBottom: 15,
+    marginBottom: DesignTokens.spacing.sm,
   },
   settingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: DesignTokens.spacing.sm + 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: DesignTokens.colors.border,
   },
   menuItem: {
-    paddingVertical: 12,
+    paddingVertical: DesignTokens.spacing.sm + 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: DesignTokens.colors.border,
   },
   signOutContainer: {
-    marginVertical: 20,
+    marginVertical: DesignTokens.spacing.lg,
   },
   signOutButton: {
-    backgroundColor: '#ff4444',
-    paddingVertical: 14,
-    borderRadius: 8,
+    backgroundColor: DesignTokens.colors.error,
+    paddingVertical: DesignTokens.spacing.md,
+    borderRadius: DesignTokens.borderRadius.md,
     alignItems: 'center',
   },
   signOutText: {
-    color: 'white',
-    fontSize: 16,
+    color: DesignTokens.colors.textInverse,
+    fontSize: DesignTokens.typography.fontSizes.base,
     fontWeight: 'bold',
   },
   versionContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: DesignTokens.spacing.lg,
   },
   versionText: {
-    fontSize: 12,
+    fontSize: DesignTokens.typography.fontSizes.xs,
+    color: DesignTokens.colors.textMuted,
   },
 });

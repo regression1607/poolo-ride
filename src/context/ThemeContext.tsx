@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useColorScheme as useNativeColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Theme, lightTheme, darkTheme } from '../design/tokens';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 type ColorScheme = 'light' | 'dark';
@@ -10,6 +11,7 @@ interface ThemeContextType {
   colorScheme: ColorScheme;
   setThemeMode: (mode: ThemeMode) => void;
   isDark: boolean;
+  theme: Theme;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -25,6 +27,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     themeMode === 'system' ? systemColorScheme : themeMode;
   
   const isDark = colorScheme === 'dark';
+  const theme = isDark ? darkTheme : lightTheme;
 
   // Load saved theme preference on app start
   useEffect(() => {
@@ -53,7 +56,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <ThemeContext.Provider value={{ themeMode, colorScheme, setThemeMode, isDark }}>
+    <ThemeContext.Provider value={{ themeMode, colorScheme, setThemeMode, isDark, theme }}>
       {children}
     </ThemeContext.Provider>
   );

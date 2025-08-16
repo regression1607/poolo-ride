@@ -2,11 +2,11 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/src/components/legacy/ThemedText';
+import { ThemedView } from '@/src/components/legacy/ThemedView';
 import { useAuth } from '@/src/context/AuthContext';
-import { TextInput } from '@/components/ui/TextInput';
-import { PasswordInput } from '@/components/ui/PasswordInput';
+import { Input } from '@/src/components';
+import { PasswordInput } from '@/src/components/legacy/ui/PasswordInput';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
@@ -61,21 +61,20 @@ export default function RegisterScreen() {
       </View>
 
       <View style={styles.formContainer}>
-        <TextInput
+        <Input
           placeholder="Full Name"
           value={name}
           onChangeText={setName}
+          autoCapitalize="words"
         />
 
-        <TextInput
+        <Input
           placeholder="Email"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
-        />
-        
-        <PasswordInput
+        />        <PasswordInput
           placeholder="Password"
           value={password}
           onChangeText={setPassword}

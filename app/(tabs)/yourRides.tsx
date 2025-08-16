@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, TouchableOpacity, FlatList, ViewStyle, TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText, ThemedView } from '@/src/components';
+import { DesignTokens } from '@/src/design/tokens';
 
 type TabType = 'active' | 'completed' | 'cancelled';
 
@@ -67,47 +67,48 @@ export default function YourRidesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-  },
+    padding: DesignTokens.spacing.md,
+  } as ViewStyle,
   header: {
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: DesignTokens.spacing.lg,
+    marginBottom: DesignTokens.spacing.lg,
     alignItems: 'center',
-  },
+  } as ViewStyle,
   tabsContainer: {
     flexDirection: 'row',
-    marginBottom: 20,
-    borderRadius: 8,
+    marginBottom: DesignTokens.spacing.lg,
+    borderRadius: DesignTokens.borderRadius.md,
     overflow: 'hidden',
-  },
+  } as ViewStyle,
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: DesignTokens.spacing.sm + 4,
     alignItems: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
-  },
+  } as ViewStyle,
   activeTab: {
-    borderBottomColor: '#0a7ea4',
-  },
+    borderBottomColor: DesignTokens.colors.primary,
+  } as ViewStyle,
   tabText: {
-    fontSize: 14,
-  },
+    fontSize: DesignTokens.typography.fontSizes.sm,
+    color: DesignTokens.colors.textSecondary,
+  } as TextStyle,
   activeTabText: {
-    color: '#0a7ea4',
-    fontWeight: 'bold',
-  },
+    color: DesignTokens.colors.primary,
+    fontWeight: '700',
+  } as TextStyle,
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-  },
+    padding: DesignTokens.spacing.lg,
+  } as ViewStyle,
   helpText: {
-    fontSize: 14,
+    fontSize: DesignTokens.typography.fontSizes.sm,
+    color: DesignTokens.colors.textMuted,
     textAlign: 'center',
-    marginTop: 12,
-    opacity: 0.7,
-    lineHeight: 20,
-  },
+    marginTop: DesignTokens.spacing.sm + 4,
+    lineHeight: DesignTokens.typography.lineHeights.normal * DesignTokens.typography.fontSizes.sm,
+  } as TextStyle,
 });
