@@ -112,48 +112,54 @@ export default function SearchScreen() {
               {/* Person Count */}
               <View style={styles.selectionSection}>
                 <ThemedText style={styles.sectionLabel}>
-                  👥 Passengers
+                  👥 How many passengers?
                 </ThemedText>
-                <View style={styles.buttonRow}>
-                  {PERSON_COUNTS.map((count) => (
-                    <TouchableOpacity
-                      key={count}
-                      style={[
-                        styles.countButton,
-                        personCount === count && styles.selectedCountButton
-                      ]}
-                      onPress={() => setPersonCount(count)}
-                    >
-                      <ThemedText style={[
-                        styles.countButtonText,
-                        personCount === count && styles.selectedCountButtonText
-                      ]}>
-                        {count}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  ))}
+                <View style={styles.passengerSelector}>
+                  <TouchableOpacity
+                    style={styles.counterButton}
+                    onPress={() => setPersonCount(Math.max(1, personCount - 1))}
+                  >
+                    <ThemedText style={styles.counterButtonText}>−</ThemedText>
+                  </TouchableOpacity>
+                  
+                  <View style={styles.passengerDisplay}>
+                    <ThemedText style={styles.passengerCount}>{personCount}</ThemedText>
+                    <ThemedText style={styles.passengerLabel}>
+                      {personCount === 1 ? 'passenger' : 'passengers'}
+                    </ThemedText>
+                  </View>
+                  
+                  <TouchableOpacity
+                    style={styles.counterButton}
+                    onPress={() => setPersonCount(Math.min(6, personCount + 1))}
+                  >
+                    <ThemedText style={styles.counterButtonText}>+</ThemedText>
+                  </TouchableOpacity>
                 </View>
               </View>
 
               {/* Ride Mode */}
               <View style={styles.selectionSection}>
                 <ThemedText style={styles.sectionLabel}>
-                  🚗 Vehicle Type
+                  🚗 Choose your ride
                 </ThemedText>
-                <View style={styles.modeRow}>
+                <View style={styles.compactVehicleRow}>
                   {RIDE_MODES.map((mode) => (
                     <TouchableOpacity
                       key={mode.id}
                       style={[
-                        styles.modeButton,
-                        rideMode === mode.id && [styles.selectedModeButton, { backgroundColor: mode.color }]
+                        styles.compactVehicleButton,
+                        rideMode === mode.id && [styles.selectedCompactVehicle, { borderColor: mode.color }]
                       ]}
                       onPress={() => setRideMode(mode.id)}
+                      activeOpacity={0.7}
                     >
-                      <ThemedText style={styles.modeIcon}>{mode.icon}</ThemedText>
+                      <ThemedText style={styles.compactVehicleIcon}>
+                        {mode.icon}
+                      </ThemedText>
                       <ThemedText style={[
-                        styles.modeButtonText,
-                        rideMode === mode.id && styles.selectedModeButtonText
+                        styles.compactVehicleText,
+                        rideMode === mode.id && { color: mode.color, fontWeight: '700' }
                       ]}>
                         {mode.name}
                       </ThemedText>
@@ -333,12 +339,113 @@ const styles = StyleSheet.create({
 
   // Selection Sections
   selectionSection: {
-    gap: DesignTokens.spacing.xs, // Reduced from sm
+    gap: DesignTokens.spacing.md,
   },
   sectionLabel: {
+    fontSize: DesignTokens.typography.fontSizes.lg,
+    fontWeight: '700',
+    color: DesignTokens.colors.textPrimary,
+    marginBottom: DesignTokens.spacing.sm,
+  },
+
+  // Passenger Count Selector
+  passengerSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: DesignTokens.colors.backgroundSecondary,
+    borderRadius: DesignTokens.borderRadius.xl,
+    padding: DesignTokens.spacing.lg,
+    ...DesignTokens.shadows.sm,
+  },
+  counterButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: DesignTokens.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...DesignTokens.shadows.sm,
+  },
+  counterButtonText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: DesignTokens.colors.textInverse,
+  },
+  passengerDisplay: {
+    alignItems: 'center',
+    marginHorizontal: DesignTokens.spacing.lg,
+    minWidth: 80,
+  },
+  passengerCount: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: DesignTokens.colors.primary,
+    marginBottom: 2,
+  },
+  passengerLabel: {
+    fontSize: DesignTokens.typography.fontSizes.sm,
+    color: DesignTokens.colors.textSecondary,
+    fontWeight: '600',
+  },
+
+  // Vehicle Selection Grid
+  vehicleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: DesignTokens.spacing.md,
+  },
+  vehicleCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: DesignTokens.colors.surface,
+    borderRadius: DesignTokens.borderRadius.xl,
+    padding: DesignTokens.spacing.lg,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: DesignTokens.colors.border,
+    position: 'relative',
+    ...DesignTokens.shadows.sm,
+  },
+  selectedVehicleCard: {
+    borderWidth: 3,
+    ...DesignTokens.shadows.md,
+  },
+  vehicleIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: DesignTokens.colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: DesignTokens.spacing.md,
+  },
+  vehicleEmoji: {
+    fontSize: 32,
+  },
+  selectedVehicleEmoji: {
+    transform: [{ scale: 1.1 }],
+  },
+  vehicleName: {
     fontSize: DesignTokens.typography.fontSizes.base,
     fontWeight: '600',
     color: DesignTokens.colors.textPrimary,
+    textAlign: 'center',
+  },
+  selectedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedCheck: {
+    fontSize: 14,
+    color: DesignTokens.colors.textInverse,
+    fontWeight: '700',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -346,57 +453,108 @@ const styles = StyleSheet.create({
   },
   countButton: {
     flex: 1,
-    backgroundColor: DesignTokens.colors.backgroundSecondary,
-    borderRadius: DesignTokens.borderRadius.md,
-    paddingVertical: DesignTokens.spacing.sm + 2, // Reduced padding
+    backgroundColor: DesignTokens.colors.surface,
+    borderRadius: DesignTokens.borderRadius.lg,
+    paddingVertical: DesignTokens.spacing.md,
+    paddingHorizontal: DesignTokens.spacing.sm,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: DesignTokens.colors.border,
-    minWidth: 50, // Ensure minimum width
+    ...DesignTokens.shadows.sm,
   },
   selectedCountButton: {
     backgroundColor: DesignTokens.colors.primary,
     borderColor: DesignTokens.colors.primary,
+    transform: [{ scale: 1.02 }],
+  },
+  countButtonContent: {
+    alignItems: 'center',
+    gap: DesignTokens.spacing.xs,
+  },
+  countIcon: {
+    fontSize: 20,
   },
   countButtonText: {
-    fontSize: DesignTokens.typography.fontSizes.base,
-    fontWeight: '600',
+    fontSize: DesignTokens.typography.fontSizes.lg,
+    fontWeight: '700',
     color: DesignTokens.colors.textPrimary,
   },
   selectedCountButtonText: {
     color: DesignTokens.colors.textInverse,
   },
+  countLabel: {
+    fontSize: DesignTokens.typography.fontSizes.xs,
+    color: DesignTokens.colors.textMuted,
+    fontWeight: '500',
+  },
+  selectedCountLabel: {
+    color: DesignTokens.colors.textInverse,
+    opacity: 0.9,
+  },
 
   // Mode Selection
   modeRow: {
     flexDirection: 'row',
-    gap: DesignTokens.spacing.xs, // Reduced gap for better fit
-    flexWrap: 'wrap', // Allow wrapping on smaller screens
+    gap: DesignTokens.spacing.sm,
   },
   modeButton: {
     flex: 1,
-    minWidth: 70, // Ensure minimum width for proper display
-    backgroundColor: DesignTokens.colors.backgroundSecondary,
-    borderRadius: DesignTokens.borderRadius.md,
-    paddingVertical: DesignTokens.spacing.sm + 2, // Slightly reduced padding
+    backgroundColor: DesignTokens.colors.surface,
+    borderRadius: DesignTokens.borderRadius.lg,
+    paddingVertical: DesignTokens.spacing.md + 4,
+    paddingHorizontal: DesignTokens.spacing.sm,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: DesignTokens.colors.border,
-    gap: DesignTokens.spacing.xs - 2, // Reduced gap
+    ...DesignTokens.shadows.sm,
+    position: 'relative',
   },
   selectedModeButton: {
     borderWidth: 3,
-    ...DesignTokens.shadows.sm,
+    transform: [{ scale: 1.02 }],
+    ...DesignTokens.shadows.md,
+  },
+  modeButtonContent: {
+    alignItems: 'center',
+    gap: DesignTokens.spacing.xs,
+    width: '100%',
+  },
+  modeIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: DesignTokens.borderRadius.round,
+    backgroundColor: DesignTokens.colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedModeIconContainer: {
+    backgroundColor: DesignTokens.colors.textInverse,
   },
   modeIcon: {
-    fontSize: 20, // Reduced from 24
+    fontSize: 20,
   },
   modeButtonText: {
-    fontSize: DesignTokens.typography.fontSizes.xs, // Reduced from sm
+    fontSize: DesignTokens.typography.fontSizes.sm,
     fontWeight: '600',
     color: DesignTokens.colors.textPrimary,
   },
   selectedModeButtonText: {
+    color: DesignTokens.colors.textInverse,
+    fontWeight: '700',
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: DesignTokens.borderRadius.round,
+    backgroundColor: DesignTokens.colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmark: {
+    fontSize: 12,
     color: DesignTokens.colors.textInverse,
     fontWeight: '700',
   },
@@ -498,5 +656,37 @@ const styles = StyleSheet.create({
     fontSize: DesignTokens.typography.fontSizes.sm,
     color: DesignTokens.colors.textMuted,
     fontWeight: '600',
+  },
+
+  // Compact Vehicle Selection
+  compactVehicleRow: {
+    flexDirection: 'row',
+    gap: DesignTokens.spacing.sm,
+  },
+  compactVehicleButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: DesignTokens.colors.backgroundSecondary,
+    borderRadius: DesignTokens.borderRadius.md,
+    paddingVertical: DesignTokens.spacing.sm + 2,
+    paddingHorizontal: DesignTokens.spacing.xs,
+    borderWidth: 2,
+    borderColor: DesignTokens.colors.border,
+    gap: DesignTokens.spacing.xs,
+  },
+  selectedCompactVehicle: {
+    backgroundColor: `${DesignTokens.colors.backgroundSecondary}80`,
+    borderWidth: 2,
+    ...DesignTokens.shadows.sm,
+  },
+  compactVehicleIcon: {
+    fontSize: 16,
+  },
+  compactVehicleText: {
+    fontSize: DesignTokens.typography.fontSizes.xs,
+    fontWeight: '600',
+    color: DesignTokens.colors.textPrimary,
   },
 });
