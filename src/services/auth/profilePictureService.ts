@@ -34,7 +34,7 @@ export class ProfilePictureService {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1], // Square aspect ratio for profile pictures
       quality: 0.8,
@@ -54,7 +54,7 @@ export class ProfilePictureService {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1], // Square aspect ratio for profile pictures
       quality: 0.8,
