@@ -32,10 +32,13 @@ interface RideData {
   description: string;
 }
 
+type DateSelection = 'today' | 'tomorrow' | 'custom';
+
 export const PublishScreen: React.FC = () => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [selectedDateOption, setSelectedDateOption] = useState<DateSelection>('today');
   const [rideData, setRideData] = useState<RideData>({
     fromLocation: '',
     toLocation: '',
@@ -59,7 +62,22 @@ export const PublishScreen: React.FC = () => {
   const getTimeSlots = () => {
     const slots = [];
     const now = new Date();
-    const startHour = now.getHours() < 6 ? 6 : now.getHours() + 1;
+    const selectedDate = rideData.departureDate;
+    
+    console.log('=== GET TIME SLOTS ===');
+    console.log('Current time:', now.toLocaleString());
+    console.log('Selected date:', selectedDate.toDateString());
+    
+    // Check if selected date is today
+    const isToday = selectedDate.toDateString() === now.toDateString();
+    console.log('Is today?', isToday);
+    
+    // If it's today, start from current hour + 1, otherwise start from 6 AM
+    const startHour = isToday 
+      ? (now.getHours() < 6 ? 6 : now.getHours() + 1)
+      : 6;
+    
+    console.log('Start hour:', startHour);
     
     for (let hour = startHour; hour <= 23; hour++) {
       for (let minute of [0, 30]) {
@@ -67,7 +85,12 @@ export const PublishScreen: React.FC = () => {
         slots.push(time);
       }
     }
-    return slots.slice(0, 12); // Show next 12 time slots
+    
+    // For today, limit to next 12 slots, for future dates show more options
+    const finalSlots = isToday ? slots.slice(0, 12) : slots;
+    console.log('Generated time slots:', finalSlots);
+    
+    return finalSlots;
   };
 
   const handleNext = () => {
@@ -164,6 +187,7 @@ export const PublishScreen: React.FC = () => {
 
   const resetForm = () => {
     setCurrentStep(1);
+    setSelectedDateOption('today');
     setRideData({
       fromLocation: '',
       toLocation: '',
@@ -178,6 +202,38 @@ export const PublishScreen: React.FC = () => {
 
   const updateRideData = (key: keyof RideData, value: any) => {
     setRideData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleDateSelection = (option: DateSelection) => {
+    console.log('=== DATE SELECTION ===');
+    console.log('Selected option:', option);
+    
+    setSelectedDateOption(option);
+    
+    const today = new Date();
+    let selectedDate = new Date();
+    
+    switch (option) {
+      case 'today':
+        selectedDate = today;
+        break;
+      case 'tomorrow':
+        selectedDate = new Date(today);
+        selectedDate.setDate(today.getDate() + 1);
+        break;
+      case 'custom':
+        // For now, we'll use a simple prompt. In production, you'd use a proper date picker
+        Alert.alert('Custom Date', 'Custom date picker functionality coming soon. Using tomorrow for now.');
+        selectedDate = new Date(today);
+        selectedDate.setDate(today.getDate() + 1);
+        break;
+    }
+    
+    console.log('Selected date:', selectedDate.toDateString());
+    updateRideData('departureDate', selectedDate);
+    // Clear selected time when date changes so user picks new time
+    updateRideData('departureTime', '');
+    console.log('Time slots should refresh now');
   };
 
   const renderStep1 = () => (
@@ -228,15 +284,52 @@ export const PublishScreen: React.FC = () => {
       <View style={styles.dateSection}>
         <Text style={styles.sectionLabel}>Select Date</Text>
         <View style={styles.dateButtons}>
-          <TouchableOpacity style={[styles.dateButton, styles.selectedDateButton]}>
-            <Text style={[styles.dateButtonText, styles.selectedDateText]}>Today</Text>
+          <TouchableOpacity 
+            style={[
+              styles.dateButton, 
+              selectedDateOption === 'today' && styles.selectedDateButton
+            ]}
+            onPress={() => handleDateSelection('today')}
+          >
+            <Text style={[
+              styles.dateButtonText, 
+              selectedDateOption === 'today' && styles.selectedDateText
+            ]}>
+              Today
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.dateButton}>
-            <Text style={styles.dateButtonText}>Tomorrow</Text>
+          
+          <TouchableOpacity 
+            style={[
+              styles.dateButton,
+              selectedDateOption === 'tomorrow' && styles.selectedDateButton
+            ]}
+            onPress={() => handleDateSelection('tomorrow')}
+          >
+            <Text style={[
+              styles.dateButtonText,
+              selectedDateOption === 'tomorrow' && styles.selectedDateText
+            ]}>
+              Tomorrow
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.dateButton}>
-            <Ionicons name="calendar" size={16} color={colors.primary.main} />
-            <Text style={styles.dateButtonText}>Pick Date</Text>
+          
+          <TouchableOpacity 
+            style={[
+              styles.dateButton,
+              selectedDateOption === 'custom' && styles.selectedDateButton
+            ]}
+            onPress={() => handleDateSelection('custom')}
+          >
+            <Ionicons name="calendar" size={16} color={
+              selectedDateOption === 'custom' ? colors.primary.main : colors.neutral[600]
+            } />
+            <Text style={[
+              styles.dateButtonText,
+              selectedDateOption === 'custom' && styles.selectedDateText
+            ]}>
+              Pick Date
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
