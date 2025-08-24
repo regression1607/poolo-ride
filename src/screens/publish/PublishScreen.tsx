@@ -18,6 +18,8 @@ import { Input } from '../../components/common/Input';
 import { SeatSelector } from '../../components/ride-specific/SeatSelector';
 import { VehicleTypeSelector } from '../../components/ride-specific/VehicleTypeSelector';
 import { VehicleType } from '../../types/ride';
+import { rideService } from '../../services/api/rideService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface RideData {
   fromLocation: string;
@@ -31,7 +33,9 @@ interface RideData {
 }
 
 export const PublishScreen: React.FC = () => {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [rideData, setRideData] = useState<RideData>({
     fromLocation: '',
     toLocation: '',
@@ -106,30 +110,70 @@ export const PublishScreen: React.FC = () => {
     return true;
   };
 
-  const handlePublish = () => {
-    Alert.alert(
-      'Publish Ride',
-      'Your ride has been published successfully! Passengers can now book seats.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Reset form
-            setCurrentStep(1);
-            setRideData({
-              fromLocation: '',
-              toLocation: '',
-              departureDate: new Date(),
-              departureTime: '',
-              availableSeats: 2,
-              vehicleType: 'car',
-              pricePerSeat: '',
-              description: '',
-            });
+  const handlePublish = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated. Please login again.');
+      return;
+    }
+
+    try {
+      setIsPublishing(true);
+      console.log('=== PUBLISH SCREEN: Starting ride creation ===');
+      console.log('Ride data:', rideData);
+      console.log('User ID:', user.id);
+
+      // Create the ride using the ride service
+      const createdRide = await rideService.createRide(rideData, user.id);
+      
+      console.log('Ride created successfully:', createdRide);
+
+      Alert.alert(
+        'Success! 🎉',
+        'Your ride has been published successfully! Passengers can now book seats.',
+        [
+          {
+            text: 'View My Rides',
+            onPress: () => {
+              // Reset form and navigate to rides screen
+              resetForm();
+              // TODO: Navigate to My Rides tab
+            },
           },
-        },
-      ]
-    );
+          {
+            text: 'Publish Another',
+            onPress: () => {
+              resetForm();
+            },
+            style: 'default',
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Publish ride error:', error);
+      
+      let errorMessage = 'Failed to publish ride. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Publishing Failed', errorMessage);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const resetForm = () => {
+    setCurrentStep(1);
+    setRideData({
+      fromLocation: '',
+      toLocation: '',
+      departureDate: new Date(),
+      departureTime: '',
+      availableSeats: 2,
+      vehicleType: 'car',
+      pricePerSeat: '',
+      description: '',
+    });
   };
 
   const updateRideData = (key: keyof RideData, value: any) => {
@@ -414,6 +458,8 @@ export const PublishScreen: React.FC = () => {
               variant="primary"
               size="large"
               style={styles.nextButton}
+              loading={isPublishing}
+              disabled={isPublishing}
             />
           </View>
         </LinearGradient>
