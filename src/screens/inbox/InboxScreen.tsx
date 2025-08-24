@@ -123,6 +123,14 @@ export const InboxScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Messages</Text>
+        <TouchableOpacity style={styles.searchButton}>
+          <Ionicons name="search" size={24} color={colors.neutral[700]} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {conversations.length > 0 ? (
           <View style={styles.conversationsList}>
@@ -139,7 +147,29 @@ export const InboxScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.neutral[50],
+  },
+
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingTop: spacing.lg,
     backgroundColor: colors.neutral.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[200],
+  },
+
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.neutral[900],
+  },
+
+  searchButton: {
+    padding: spacing.xs,
   },
 
   scrollView: {
