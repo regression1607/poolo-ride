@@ -13,7 +13,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme/colors';
 import { Button } from '../../components/common/Button';
-import { VehicleType, RideStatus, BookingStatus } from '../../types/ride';
+import { VehicleType, RideStatus, BookingStatus, Ride } from '../../types/ride';
+import { rideService } from '../../services/api/rideService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface RideData {
   id: string;
@@ -45,18 +47,62 @@ interface BookingRequest {
 }
 
 export const RidesScreen: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'published' | 'booked'>('published');
   const [rides, setRides] = useState<RideData[]>([]);
+  const [publishedRides, setPublishedRides] = useState<Ride[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadRides();
-  }, []);
+  }, [user]);
 
   const loadRides = async () => {
-    // TODO: Replace with actual API call to fetch user's rides
-    // For now, start with empty data - no mock data
-    setRides([]);
+    if (!user?.id) {
+      console.log('No user found, skipping ride loading');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log('=== RIDES SCREEN: Loading published rides ===');
+      console.log('User ID:', user.id);
+
+      // Fetch published rides by the current user
+      const userPublishedRides = await rideService.getRidesByDriver(user.id);
+      console.log('Published rides fetched:', userPublishedRides.length);
+      
+      setPublishedRides(userPublishedRides);
+
+      // Convert published rides to RideData format for display
+      const formattedPublishedRides: RideData[] = userPublishedRides.map(ride => ({
+        id: ride.id,
+        type: 'published' as const,
+        from: ride.pickup_address,
+        to: ride.drop_address,
+        date: new Date(ride.pickup_time).toLocaleDateString(),
+        time: new Date(ride.pickup_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        seats: ride.total_seats,
+        availableSeats: ride.available_seats,
+        price: ride.price_per_seat,
+        vehicleType: ride.vehicle_type,
+        status: ride.status,
+        canCancel: ride.status === 'available',
+      }));
+
+      // TODO: Fetch booked rides (rides where user is a passenger)
+      const bookedRides: RideData[] = [];
+
+      setRides([...formattedPublishedRides, ...bookedRides]);
+      
+    } catch (error) {
+      console.error('Error loading rides:', error);
+      Alert.alert('Error', 'Failed to load rides. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRefresh = async () => {
@@ -151,7 +197,7 @@ export const RidesScreen: React.FC = () => {
     );
   };
 
-  const handleCancelRide = (rideId: string, rideType: 'published' | 'booked') => {
+  const handleCancelRide = async (rideId: string, rideType: 'published' | 'booked') => {
     const title = rideType === 'published' ? 'Cancel Published Ride' : 'Cancel Booking';
     const message = rideType === 'published' 
       ? 'Are you sure you want to cancel this ride? All passengers will be notified.'
@@ -162,11 +208,23 @@ export const RidesScreen: React.FC = () => {
       {
         text: 'Yes, Cancel',
         style: 'destructive',
-        onPress: () => {
-          setRides(prev => prev.map(ride => 
-            ride.id === rideId ? { ...ride, status: 'cancelled' as any, canCancel: false } : ride
-          ));
-          Alert.alert('Success', `${rideType === 'published' ? 'Ride' : 'Booking'} cancelled successfully.`);
+        onPress: async () => {
+          try {
+            if (rideType === 'published') {
+              // Update ride status in database
+              await rideService.updateRideStatus(rideId, 'cancelled');
+            }
+            
+            // Update local state
+            setRides(prev => prev.map(ride => 
+              ride.id === rideId ? { ...ride, status: 'cancelled' as any, canCancel: false } : ride
+            ));
+            
+            Alert.alert('Success', `${rideType === 'published' ? 'Ride' : 'Booking'} cancelled successfully.`);
+          } catch (error) {
+            console.error('Error cancelling ride:', error);
+            Alert.alert('Error', 'Failed to cancel ride. Please try again.');
+          }
         },
       },
     ]);
@@ -418,9 +476,14 @@ export const RidesScreen: React.FC = () => {
             </Text>
             <Text style={styles.emptyStateSubtitle}>
               {activeTab === 'published'
-                ? 'Start by publishing your first ride'
+                ? 'Start by publishing your first ride using the Publish tab'
                 : 'Search for rides and book your first trip'}
             </Text>
+            {!isLoading && activeTab === 'published' && (
+              <Text style={styles.emptyStateNote}>
+                Rides you publish will appear here automatically
+              </Text>
+            )}
           </View>
         }
       />
@@ -752,5 +815,12 @@ const styles = StyleSheet.create({
     color: colors.neutral[500],
     textAlign: 'center',
     lineHeight: 20,
+  },
+  emptyStateNote: {
+    fontSize: 12,
+    color: colors.neutral[400],
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    fontStyle: 'italic',
   },
 });

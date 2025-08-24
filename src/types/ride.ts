@@ -24,7 +24,7 @@ export interface Ride {
 }
 
 export type VehicleType = 'bike' | 'car' | 'cab' | 'suv';
-export type RideStatus = 'active' | 'completed' | 'cancelled';
+export type RideStatus = 'available' | 'active' | 'completed' | 'cancelled';
 
 // Booking-related types
 export interface RideBooking {
