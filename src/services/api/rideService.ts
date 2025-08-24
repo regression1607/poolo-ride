@@ -31,6 +31,70 @@ export interface CreateRideRequest {
 
 class RideService {
   /**
+   * Check for time conflicts with existing rides
+   */
+  async checkTimeConflict(driverId: string, proposedStartTime: string, estimatedDurationHours: number = 2): Promise<{ hasConflict: boolean; conflictingRide?: Ride }> {
+    try {
+      console.log('=== RIDE SERVICE: Checking time conflicts ===');
+      console.log('Driver ID:', driverId);
+      console.log('Proposed start time:', proposedStartTime);
+      console.log('Estimated duration:', estimatedDurationHours, 'hours');
+
+      // Get all active rides for the driver
+      const driverRides = await this.getRidesByDriver(driverId);
+      
+      // Filter only active/available rides (not cancelled or completed)
+      const activeRides = driverRides.filter(ride => 
+        ride.status === 'available' || ride.status === 'active'
+      );
+
+      const proposedStart = new Date(proposedStartTime);
+      const proposedEnd = new Date(proposedStart.getTime() + (estimatedDurationHours * 60 * 60 * 1000));
+
+      console.log('Proposed ride window:', proposedStart.toISOString(), 'to', proposedEnd.toISOString());
+      console.log('Checking against', activeRides.length, 'active rides');
+
+      for (const existingRide of activeRides) {
+        const existingStart = new Date(existingRide.pickup_time);
+        
+        // Estimate existing ride duration (default 2 hours if not specified)
+        let existingEnd: Date;
+        if (existingRide.expected_drop_time) {
+          existingEnd = new Date(existingRide.expected_drop_time);
+        } else {
+          // Default 2-hour duration if no drop time specified
+          existingEnd = new Date(existingStart.getTime() + (2 * 60 * 60 * 1000));
+        }
+
+        console.log('Existing ride window:', existingStart.toISOString(), 'to', existingEnd.toISOString());
+
+        // Check for overlap
+        const hasOverlap = (
+          (proposedStart >= existingStart && proposedStart < existingEnd) || // Proposed starts during existing
+          (proposedEnd > existingStart && proposedEnd <= existingEnd) || // Proposed ends during existing
+          (proposedStart <= existingStart && proposedEnd >= existingEnd) // Proposed completely contains existing
+        );
+
+        if (hasOverlap) {
+          console.log('TIME CONFLICT DETECTED with ride:', existingRide.id);
+          return {
+            hasConflict: true,
+            conflictingRide: existingRide
+          };
+        }
+      }
+
+      console.log('No time conflicts found');
+      return { hasConflict: false };
+    } catch (error) {
+      console.error('RideService.checkTimeConflict error:', error);
+      // If we can't check for conflicts, don't block the user - log and continue
+      console.warn('Continuing without conflict check due to error');
+      return { hasConflict: false };
+    }
+  }
+
+  /**
    * Create a new ride
    */
   async createRide(rideData: CreateRideData, driverId: string): Promise<Ride> {
@@ -41,6 +105,18 @@ class RideService {
 
       // Convert the form data to database format
       const departureDateTime = this.combineDateAndTime(rideData.departureDate, rideData.departureTime);
+      
+      // Check for time conflicts before creating the ride
+      const conflictCheck = await this.checkTimeConflict(driverId, departureDateTime);
+      
+      if (conflictCheck.hasConflict && conflictCheck.conflictingRide) {
+        const conflictRide = conflictCheck.conflictingRide;
+        const conflictTime = new Date(conflictRide.pickup_time).toLocaleString();
+        
+        throw new Error(
+          `You already have a ride scheduled at ${conflictTime} from ${conflictRide.pickup_address} to ${conflictRide.drop_address}. Please cancel that ride first or choose a different time.`
+        );
+      }
       
       const createRideRequest: CreateRideRequest = {
         driver_id: driverId,

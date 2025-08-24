@@ -32,10 +32,13 @@ interface RideData {
   description: string;
 }
 
+type DateSelection = 'today' | 'tomorrow' | 'custom';
+
 export const PublishScreen: React.FC = () => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [selectedDateOption, setSelectedDateOption] = useState<DateSelection>('today');
   const [rideData, setRideData] = useState<RideData>({
     fromLocation: '',
     toLocation: '',
@@ -152,11 +155,18 @@ export const PublishScreen: React.FC = () => {
       console.error('Publish ride error:', error);
       
       let errorMessage = 'Failed to publish ride. Please try again.';
+      let errorTitle = 'Publishing Failed';
+      
       if (error instanceof Error) {
         errorMessage = error.message;
+        
+        // Check if it's a time conflict error
+        if (errorMessage.includes('already have a ride scheduled')) {
+          errorTitle = 'Time Conflict';
+        }
       }
       
-      Alert.alert('Publishing Failed', errorMessage);
+      Alert.alert(errorTitle, errorMessage);
     } finally {
       setIsPublishing(false);
     }
@@ -164,6 +174,7 @@ export const PublishScreen: React.FC = () => {
 
   const resetForm = () => {
     setCurrentStep(1);
+    setSelectedDateOption('today');
     setRideData({
       fromLocation: '',
       toLocation: '',
@@ -178,6 +189,31 @@ export const PublishScreen: React.FC = () => {
 
   const updateRideData = (key: keyof RideData, value: any) => {
     setRideData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleDateSelection = (option: DateSelection) => {
+    setSelectedDateOption(option);
+    
+    const today = new Date();
+    let selectedDate = new Date();
+    
+    switch (option) {
+      case 'today':
+        selectedDate = today;
+        break;
+      case 'tomorrow':
+        selectedDate = new Date(today);
+        selectedDate.setDate(today.getDate() + 1);
+        break;
+      case 'custom':
+        // For now, we'll use a simple prompt. In production, you'd use a proper date picker
+        Alert.alert('Custom Date', 'Custom date picker functionality coming soon. Using tomorrow for now.');
+        selectedDate = new Date(today);
+        selectedDate.setDate(today.getDate() + 1);
+        break;
+    }
+    
+    updateRideData('departureDate', selectedDate);
   };
 
   const renderStep1 = () => (
@@ -228,15 +264,52 @@ export const PublishScreen: React.FC = () => {
       <View style={styles.dateSection}>
         <Text style={styles.sectionLabel}>Select Date</Text>
         <View style={styles.dateButtons}>
-          <TouchableOpacity style={[styles.dateButton, styles.selectedDateButton]}>
-            <Text style={[styles.dateButtonText, styles.selectedDateText]}>Today</Text>
+          <TouchableOpacity 
+            style={[
+              styles.dateButton, 
+              selectedDateOption === 'today' && styles.selectedDateButton
+            ]}
+            onPress={() => handleDateSelection('today')}
+          >
+            <Text style={[
+              styles.dateButtonText, 
+              selectedDateOption === 'today' && styles.selectedDateText
+            ]}>
+              Today
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.dateButton}>
-            <Text style={styles.dateButtonText}>Tomorrow</Text>
+          
+          <TouchableOpacity 
+            style={[
+              styles.dateButton,
+              selectedDateOption === 'tomorrow' && styles.selectedDateButton
+            ]}
+            onPress={() => handleDateSelection('tomorrow')}
+          >
+            <Text style={[
+              styles.dateButtonText,
+              selectedDateOption === 'tomorrow' && styles.selectedDateText
+            ]}>
+              Tomorrow
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.dateButton}>
-            <Ionicons name="calendar" size={16} color={colors.primary.main} />
-            <Text style={styles.dateButtonText}>Pick Date</Text>
+          
+          <TouchableOpacity 
+            style={[
+              styles.dateButton,
+              selectedDateOption === 'custom' && styles.selectedDateButton
+            ]}
+            onPress={() => handleDateSelection('custom')}
+          >
+            <Ionicons name="calendar" size={16} color={
+              selectedDateOption === 'custom' ? colors.primary.main : colors.neutral[600]
+            } />
+            <Text style={[
+              styles.dateButtonText,
+              selectedDateOption === 'custom' && styles.selectedDateText
+            ]}>
+              Pick Date
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -340,7 +413,7 @@ export const PublishScreen: React.FC = () => {
         <View style={styles.reviewSection}>
           <Text style={styles.reviewLabel}>Departure</Text>
           <Text style={styles.reviewValue}>
-            Today at {rideData.departureTime}
+            {rideData.departureDate.toLocaleDateString()} at {rideData.departureTime}
           </Text>
         </View>
 
