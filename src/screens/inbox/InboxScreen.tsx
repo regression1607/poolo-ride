@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme/colors';
 
@@ -21,6 +21,8 @@ interface ChatConversation {
 }
 
 export const InboxScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  
   // Mock chat conversations
   const conversations: ChatConversation[] = [
     {
@@ -122,7 +124,7 @@ export const InboxScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
@@ -140,7 +142,7 @@ export const InboxScreen: React.FC = () => {
           renderEmptyState()
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

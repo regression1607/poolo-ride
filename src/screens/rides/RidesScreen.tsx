@@ -9,7 +9,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme/colors';
 import { Button } from '../../components/common/Button';
@@ -48,6 +48,7 @@ interface BookingRequest {
 
 export const RidesScreen: React.FC = () => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'published' | 'booked'>('published');
   const [rides, setRides] = useState<RideData[]>([]);
   const [publishedRides, setPublishedRides] = useState<Ride[]>([]);
@@ -389,7 +390,7 @@ export const RidesScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Tab Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Rides</Text>
@@ -487,7 +488,7 @@ export const RidesScreen: React.FC = () => {
           </View>
         }
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
