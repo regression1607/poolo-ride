@@ -1,0 +1,756 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  TouchableOpacity,
+  FlatList,
+  Alert,
+  RefreshControl,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing } from '../../theme/colors';
+import { Button } from '../../components/common/Button';
+import { VehicleType, RideStatus, BookingStatus } from '../../types/ride';
+
+interface RideData {
+  id: string;
+  type: 'published' | 'booked';
+  from: string;
+  to: string;
+  date: string;
+  time: string;
+  seats: number;
+  availableSeats?: number;
+  price: number;
+  vehicleType: VehicleType;
+  status: RideStatus | BookingStatus;
+  driverName?: string;
+  driverRating?: number;
+  passengerName?: string;
+  passengerRating?: number;
+  bookingRequests?: BookingRequest[];
+  canCancel: boolean;
+}
+
+interface BookingRequest {
+  id: string;
+  passengerName: string;
+  passengerRating: number;
+  seatsRequested: number;
+  requestTime: string;
+  message?: string;
+}
+
+export const RidesScreen: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'published' | 'booked'>('published');
+  const [rides, setRides] = useState<RideData[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    loadRides();
+  }, []);
+
+  const loadRides = async () => {
+    // TODO: Replace with actual API call to fetch user's rides
+    // For now, start with empty data - no mock data
+    setRides([]);
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadRides();
+    setIsRefreshing(false);
+  };
+
+  const filteredRides = rides.filter(ride => ride.type === activeTab);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return colors.secondary.main;
+      case 'confirmed':
+        return colors.primary.main;
+      case 'completed':
+        return colors.neutral[600];
+      case 'cancelled':
+        return colors.status.error;
+      case 'pending':
+        return colors.special.orange;
+      default:
+        return colors.neutral[500];
+    }
+  };
+
+  const getVehicleIcon = (type: VehicleType) => {
+    switch (type) {
+      case 'bike':
+        return 'bicycle';
+      case 'car':
+        return 'car';
+      case 'cab':
+      case 'suv':
+        return 'car-sport';
+      default:
+        return 'car';
+    }
+  };
+
+  const handleAcceptBooking = (rideId: string, bookingId: string) => {
+    Alert.alert(
+      'Accept Booking',
+      'Are you sure you want to accept this booking request?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Accept',
+          onPress: () => {
+            // Update ride data
+            setRides(prev => prev.map(ride => {
+              if (ride.id === rideId && ride.bookingRequests) {
+                const updatedRequests = ride.bookingRequests.filter(req => req.id !== bookingId);
+                const acceptedRequest = ride.bookingRequests.find(req => req.id === bookingId);
+                return {
+                  ...ride,
+                  availableSeats: ride.availableSeats! - (acceptedRequest?.seatsRequested || 1),
+                  bookingRequests: updatedRequests,
+                };
+              }
+              return ride;
+            }));
+            Alert.alert('Success', 'Booking request accepted successfully!');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRejectBooking = (rideId: string, bookingId: string) => {
+    Alert.alert(
+      'Reject Booking',
+      'Are you sure you want to reject this booking request?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: () => {
+            setRides(prev => prev.map(ride => {
+              if (ride.id === rideId && ride.bookingRequests) {
+                const updatedRequests = ride.bookingRequests.filter(req => req.id !== bookingId);
+                return { ...ride, bookingRequests: updatedRequests };
+              }
+              return ride;
+            }));
+            Alert.alert('Success', 'Booking request rejected.');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCancelRide = (rideId: string, rideType: 'published' | 'booked') => {
+    const title = rideType === 'published' ? 'Cancel Published Ride' : 'Cancel Booking';
+    const message = rideType === 'published' 
+      ? 'Are you sure you want to cancel this ride? All passengers will be notified.'
+      : 'Are you sure you want to cancel this booking?';
+    
+    Alert.alert(title, message, [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes, Cancel',
+        style: 'destructive',
+        onPress: () => {
+          setRides(prev => prev.map(ride => 
+            ride.id === rideId ? { ...ride, status: 'cancelled' as any, canCancel: false } : ride
+          ));
+          Alert.alert('Success', `${rideType === 'published' ? 'Ride' : 'Booking'} cancelled successfully.`);
+        },
+      },
+    ]);
+  };
+
+  const renderBookingRequest = (request: BookingRequest, rideId: string) => (
+    <View key={request.id} style={styles.bookingRequest}>
+      <View style={styles.requestHeader}>
+        <View style={styles.passengerInfo}>
+          <Text style={styles.passengerName}>{request.passengerName}</Text>
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={12} color={colors.special.gold} />
+            <Text style={styles.ratingText}>{request.passengerRating}</Text>
+          </View>
+        </View>
+        <Text style={styles.requestTime}>{request.requestTime}</Text>
+      </View>
+      
+      <Text style={styles.requestDetails}>
+        Wants {request.seatsRequested} seat{request.seatsRequested > 1 ? 's' : ''}
+      </Text>
+      
+      {request.message && (
+        <Text style={styles.requestMessage}>"{request.message}"</Text>
+      )}
+      
+      <View style={styles.requestActions}>
+        <Button
+          title="Reject"
+          onPress={() => handleRejectBooking(rideId, request.id)}
+          variant="secondary"
+          size="small"
+          style={styles.rejectButton}
+        />
+        <Button
+          title="Accept"
+          onPress={() => handleAcceptBooking(rideId, request.id)}
+          variant="primary"
+          size="small"
+          style={styles.acceptButton}
+        />
+      </View>
+    </View>
+  );
+
+  const renderRideCard = ({ item }: { item: RideData }) => (
+    <View style={styles.rideCard}>
+      <View style={styles.rideHeader}>
+        <View style={styles.routeInfo}>
+          <View style={styles.vehicleInfo}>
+            <Ionicons
+              name={getVehicleIcon(item.vehicleType) as any}
+              size={20}
+              color={colors.primary.main}
+            />
+            <Text style={styles.vehicleType}>{item.vehicleType.toUpperCase()}</Text>
+          </View>
+          
+          <View style={styles.statusContainer}>
+            <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
+            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+              {item.status.toUpperCase()}
+            </Text>
+          </View>
+        </View>
+        
+        <TouchableOpacity style={styles.menuButton}>
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.neutral[600]} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.routeDetails}>
+        <View style={styles.routePoint}>
+          <Ionicons name="radio-button-on" size={12} color={colors.secondary.main} />
+          <Text style={styles.routeText}>{item.from}</Text>
+        </View>
+        
+        <View style={styles.routeLine}>
+          <View style={styles.dashedLine} />
+        </View>
+        
+        <View style={styles.routePoint}>
+          <Ionicons name="location" size={12} color={colors.status.error} />
+          <Text style={styles.routeText}>{item.to}</Text>
+        </View>
+      </View>
+
+      <View style={styles.rideInfo}>
+        <View style={styles.timeInfo}>
+          <Ionicons name="time" size={16} color={colors.neutral[600]} />
+          <Text style={styles.timeText}>{item.date} at {item.time}</Text>
+        </View>
+        
+        <View style={styles.priceInfo}>
+          <Text style={styles.priceText}>₹{item.price}</Text>
+          <Text style={styles.priceLabel}>
+            {item.type === 'published' ? 'per seat' : `for ${item.seats} seat${item.seats > 1 ? 's' : ''}`}
+          </Text>
+        </View>
+      </View>
+
+      {item.type === 'published' && item.availableSeats !== undefined && (
+        <View style={styles.seatsInfo}>
+          <Text style={styles.seatsText}>
+            {item.availableSeats} of {item.seats} seats available
+          </Text>
+        </View>
+      )}
+
+      {item.type === 'booked' && item.driverName && (
+        <View style={styles.driverInfo}>
+          <Text style={styles.driverLabel}>Driver:</Text>
+          <Text style={styles.driverName}>{item.driverName}</Text>
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={12} color={colors.special.gold} />
+            <Text style={styles.ratingText}>{item.driverRating}</Text>
+          </View>
+        </View>
+      )}
+
+      {item.bookingRequests && item.bookingRequests.length > 0 && (
+        <View style={styles.bookingRequestsSection}>
+          <Text style={styles.requestsTitle}>
+            Booking Requests ({item.bookingRequests.length})
+          </Text>
+          {item.bookingRequests.map(request => renderBookingRequest(request, item.id))}
+        </View>
+      )}
+
+      <View style={styles.cardActions}>
+        {item.status === 'confirmed' && item.type === 'booked' && (
+          <Button
+            title="Contact Driver"
+            onPress={() => Alert.alert('Contact', 'Opening chat with driver...')}
+            variant="secondary"
+            size="medium"
+            style={styles.contactButton}
+          />
+        )}
+        
+        {item.canCancel && (
+          <Button
+            title={item.type === 'published' ? 'Cancel Ride' : 'Cancel Booking'}
+            onPress={() => handleCancelRide(item.id, item.type)}
+            variant="secondary"
+            size="medium"
+            style={styles.cancelButton}
+          />
+        )}
+        
+        {item.status === 'completed' && (
+          <Button
+            title="Rate & Review"
+            onPress={() => Alert.alert('Rating', 'Opening rating screen...')}
+            variant="primary"
+            size="medium"
+            style={styles.rateButton}
+          />
+        )}
+      </View>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Tab Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>My Rides</Text>
+        <TouchableOpacity style={styles.notificationButton}>
+          <Ionicons name="notifications" size={24} color={colors.neutral[700]} />
+          <View style={styles.notificationDot} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Tab Selector */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'published' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('published')}
+        >
+          <Ionicons
+            name="car"
+            size={20}
+            color={activeTab === 'published' ? colors.primary.main : colors.neutral[600]}
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === 'published' && styles.tabButtonTextActive,
+            ]}
+          >
+            Published
+          </Text>
+          {rides.filter(r => r.type === 'published').length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>
+                {rides.filter(r => r.type === 'published').length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'booked' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('booked')}
+        >
+          <Ionicons
+            name="ticket"
+            size={20}
+            color={activeTab === 'booked' ? colors.primary.main : colors.neutral[600]}
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === 'booked' && styles.tabButtonTextActive,
+            ]}
+          >
+            Booked
+          </Text>
+          {rides.filter(r => r.type === 'booked').length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>
+                {rides.filter(r => r.type === 'booked').length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Rides List */}
+      <FlatList
+        data={filteredRides}
+        renderItem={renderRideCard}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.ridesList}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons
+              name={activeTab === 'published' ? 'car-outline' : 'ticket-outline'}
+              size={64}
+              color={colors.neutral[400]}
+            />
+            <Text style={styles.emptyStateTitle}>
+              {activeTab === 'published' ? 'No published rides' : 'No booked rides'}
+            </Text>
+            <Text style={styles.emptyStateSubtitle}>
+              {activeTab === 'published'
+                ? 'Start by publishing your first ride'
+                : 'Search for rides and book your first trip'}
+            </Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.neutral[50],
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.neutral.white,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.neutral[900],
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: spacing.xs,
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.status.error,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.neutral.white,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    borderRadius: 12,
+    padding: spacing.xs,
+    shadowColor: colors.neutral[900],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+    gap: spacing.xs,
+    position: 'relative',
+  },
+  tabButtonActive: {
+    backgroundColor: colors.primary.light,
+  },
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.neutral[600],
+  },
+  tabButtonTextActive: {
+    color: colors.primary.main,
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -2,
+    right: 8,
+    backgroundColor: colors.status.error,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  tabBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.neutral.white,
+  },
+  ridesList: {
+    padding: spacing.md,
+    paddingBottom: spacing['5xl'],
+  },
+  rideCard: {
+    backgroundColor: colors.neutral.white,
+    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    shadowColor: colors.neutral[900],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  rideHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  routeInfo: {
+    flex: 1,
+  },
+  vehicleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  vehicleType: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary.main,
+    letterSpacing: 0.5,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  menuButton: {
+    padding: spacing.xs,
+  },
+  routeDetails: {
+    marginBottom: spacing.md,
+  },
+  routePoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  routeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.neutral[700],
+    flex: 1,
+  },
+  routeLine: {
+    marginLeft: 6,
+    paddingVertical: spacing.xs,
+  },
+  dashedLine: {
+    width: 1,
+    height: 20,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.neutral[300],
+    borderStyle: 'dashed',
+  },
+  rideInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  timeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  timeText: {
+    fontSize: 14,
+    color: colors.neutral[600],
+  },
+  priceInfo: {
+    alignItems: 'flex-end',
+  },
+  priceText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.neutral[900],
+  },
+  priceLabel: {
+    fontSize: 12,
+    color: colors.neutral[500],
+  },
+  seatsInfo: {
+    marginBottom: spacing.sm,
+  },
+  seatsText: {
+    fontSize: 14,
+    color: colors.secondary.main,
+    fontWeight: '500',
+  },
+  driverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  driverLabel: {
+    fontSize: 14,
+    color: colors.neutral[600],
+  },
+  driverName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.neutral[900],
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  ratingText: {
+    fontSize: 12,
+    color: colors.neutral[700],
+    fontWeight: '500',
+  },
+  bookingRequestsSection: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[200],
+  },
+  requestsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.neutral[900],
+    marginBottom: spacing.sm,
+  },
+  bookingRequest: {
+    backgroundColor: colors.neutral[50],
+    borderRadius: 12,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xs,
+  },
+  passengerInfo: {
+    flex: 1,
+  },
+  passengerName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.neutral[900],
+    marginBottom: 2,
+  },
+  requestTime: {
+    fontSize: 12,
+    color: colors.neutral[500],
+  },
+  requestDetails: {
+    fontSize: 13,
+    color: colors.neutral[600],
+    marginBottom: spacing.xs,
+  },
+  requestMessage: {
+    fontSize: 13,
+    color: colors.neutral[700],
+    fontStyle: 'italic',
+    marginBottom: spacing.sm,
+    paddingLeft: spacing.sm,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.primary.light,
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  rejectButton: {
+    flex: 1,
+  },
+  acceptButton: {
+    flex: 1,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[200],
+  },
+  contactButton: {
+    flex: 1,
+  },
+  cancelButton: {
+    flex: 1,
+  },
+  rateButton: {
+    flex: 1,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing['5xl'],
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.neutral[700],
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  emptyStateSubtitle: {
+    fontSize: 14,
+    color: colors.neutral[500],
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+});
