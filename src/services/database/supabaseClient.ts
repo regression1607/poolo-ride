@@ -21,15 +21,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const db = {
   // User operations
   users: {
-    create: (userData: any) => supabase.from('users').insert(userData),
+    create: (userData: any) => supabase.from('users').insert(userData).select(),
     getById: (id: string) => supabase.from('users').select('*').eq('id', id).single(),
     getByEmail: (email: string) => supabase.from('users').select('*').eq('email', email).single(),
-    update: (id: string, updates: any) => supabase.from('users').update(updates).eq('id', id),
+    update: (id: string, updates: any) => supabase.from('users').update(updates).eq('id', id).select(),
   },
   
   // Ride operations
   rides: {
-    create: (rideData: any) => supabase.from('rides').insert(rideData),
+    create: (rideData: any) => supabase.from('rides').insert(rideData).select(),
     getAll: () => supabase.from('rides').select('*'),
     getById: (id: string) => supabase.from('rides').select('*').eq('id', id).single(),
     getByDriver: (driverId: string) => supabase.from('rides').select('*').eq('driver_id', driverId),
@@ -38,21 +38,21 @@ export const db = {
       // Add search filters here based on pickup/drop locations, time, etc.
       return query;
     },
-    update: (id: string, updates: any) => supabase.from('rides').update(updates).eq('id', id),
+    update: (id: string, updates: any) => supabase.from('rides').update(updates).eq('id', id).select(),
     delete: (id: string) => supabase.from('rides').delete().eq('id', id),
   },
   
   // Booking operations
   bookings: {
-    create: (bookingData: any) => supabase.from('ride_bookings').insert(bookingData),
+    create: (bookingData: any) => supabase.from('ride_bookings').insert(bookingData).select(),
     getByRide: (rideId: string) => supabase.from('ride_bookings').select('*').eq('ride_id', rideId),
     getByPassenger: (passengerId: string) => supabase.from('ride_bookings').select('*').eq('passenger_id', passengerId),
-    update: (id: string, updates: any) => supabase.from('ride_bookings').update(updates).eq('id', id),
+    update: (id: string, updates: any) => supabase.from('ride_bookings').update(updates).eq('id', id).select(),
   },
   
   // Message operations
   messages: {
-    create: (messageData: any) => supabase.from('ride_messages').insert(messageData),
+    create: (messageData: any) => supabase.from('ride_messages').insert(messageData).select(),
     getByRide: (rideId: string) => supabase.from('ride_messages').select('*').eq('ride_id', rideId).order('sent_at', { ascending: true }),
   },
 };

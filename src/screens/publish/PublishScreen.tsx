@@ -8,6 +8,7 @@ import {
   ImageBackground,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,10 +33,19 @@ interface RideData {
   description: string;
 }
 
+type DateSelection = 'today' | 'tomorrow' | 'custom';
+
 export const PublishScreen: React.FC = () => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [selectedDateOption, setSelectedDateOption] = useState<DateSelection>('today');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // Time picker states
+  const [selectedHour, setSelectedHour] = useState('12');
+  const [selectedMinute, setSelectedMinute] = useState('00');
+  const [selectedPeriod, setSelectedPeriod] = useState<'AM' | 'PM'>('PM');
   const [rideData, setRideData] = useState<RideData>({
     fromLocation: '',
     toLocation: '',
@@ -49,25 +59,106 @@ export const PublishScreen: React.FC = () => {
 
   const totalSteps = 4;
 
+  // Generate hours array (1-12 for 12-hour format)
+  const getHoursArray = () => {
+    return Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+  };
+
+  // Generate minutes array (00-59) with validation
+  const getMinutesArray = () => {
+    return Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+  };
+
+  // Check if selected time is valid (at least 30 minutes from now)
+  const isTimeValid = (hour: string, minute: string, period: 'AM' | 'PM') => {
+    const now = new Date();
+    const selectedDateTime = new Date();
+    
+    // Set the selected date based on selectedDateOption
+    if (selectedDateOption === 'tomorrow') {
+      selectedDateTime.setDate(now.getDate() + 1);
+    }
+    
+    // Convert selected time to 24-hour format
+    const hour24 = convertTo24Hour(hour, period);
+    selectedDateTime.setHours(parseInt(hour24), parseInt(minute), 0, 0);
+    
+    // If it's today, check if the time is at least 30 minutes from now
+    if (selectedDateOption === 'today') {
+      const minValidTime = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
+      return selectedDateTime >= minValidTime;
+    }
+    
+    // For tomorrow, any time is valid
+    return true;
+  };
+
+  // Get valid hours based on current time
+  const getValidHours = () => {
+    const allHours = getHoursArray();
+    if (selectedDateOption === 'tomorrow') {
+      return allHours;
+    }
+    
+    // For today, filter out past hours
+    const now = new Date();
+    return allHours.filter(hour => {
+      return isTimeValid(hour, '00', selectedPeriod);
+    });
+  };
+
+  // Get valid minutes for selected hour
+  const getValidMinutes = () => {
+    const allMinutes = getMinutesArray();
+    if (selectedDateOption === 'tomorrow') {
+      return allMinutes;
+    }
+    
+    // For today, filter out past minutes for the current hour
+    return allMinutes.filter(minute => {
+      return isTimeValid(selectedHour, minute, selectedPeriod);
+    });
+  };
+
+  // Convert 12-hour format to 24-hour format
+  const convertTo24Hour = (hour: string, period: 'AM' | 'PM') => {
+    let hourNum = parseInt(hour);
+    if (period === 'AM' && hourNum === 12) {
+      hourNum = 0;
+    } else if (period === 'PM' && hourNum !== 12) {
+      hourNum += 12;
+    }
+    return hourNum.toString().padStart(2, '0');
+  };
+
+  // Get current selected time in 24-hour format
+  const getSelectedTime24 = () => {
+    const hour24 = convertTo24Hour(selectedHour, selectedPeriod);
+    return `${hour24}:${selectedMinute}`;
+  };
+
+  // Update ride data with selected time and validate
+  const updateSelectedTime = () => {
+    const timeString = getSelectedTime24();
+    
+    // Validate if the selected time is valid
+    if (!isTimeValid(selectedHour, selectedMinute, selectedPeriod)) {
+      Alert.alert(
+        'Invalid Time',
+        'Please select a time that is at least 30 minutes from now.'
+      );
+      return;
+    }
+    
+    updateRideData('departureTime', timeString);
+    console.log('Selected time updated:', timeString);
+  };
+
   const calculateSuggestedPrice = () => {
     // Mock calculation based on route distance
     const basePrice = 100;
     const distanceMultiplier = Math.floor(Math.random() * 100) + 50;
     return basePrice + distanceMultiplier;
-  };
-
-  const getTimeSlots = () => {
-    const slots = [];
-    const now = new Date();
-    const startHour = now.getHours() < 6 ? 6 : now.getHours() + 1;
-    
-    for (let hour = startHour; hour <= 23; hour++) {
-      for (let minute of [0, 30]) {
-        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        slots.push(time);
-      }
-    }
-    return slots.slice(0, 12); // Show next 12 time slots
   };
 
   const handleNext = () => {
@@ -164,6 +255,10 @@ export const PublishScreen: React.FC = () => {
 
   const resetForm = () => {
     setCurrentStep(1);
+    setSelectedDateOption('today');
+    setSelectedHour('12');
+    setSelectedMinute('00');
+    setSelectedPeriod('PM');
     setRideData({
       fromLocation: '',
       toLocation: '',
@@ -178,6 +273,67 @@ export const PublishScreen: React.FC = () => {
 
   const updateRideData = (key: keyof RideData, value: any) => {
     setRideData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleDateSelection = (option: DateSelection) => {
+    console.log('=== DATE SELECTION ===');
+    console.log('Selected option:', option);
+    
+    setSelectedDateOption(option);
+    
+    const today = new Date();
+    let selectedDate = new Date();
+    
+    switch (option) {
+      case 'today':
+        selectedDate = today;
+        break;
+      case 'tomorrow':
+        selectedDate = new Date(today);
+        selectedDate.setDate(today.getDate() + 1);
+        break;
+    }
+    
+    console.log('Selected date:', selectedDate.toDateString());
+    updateRideData('departureDate', selectedDate);
+    
+    // Reset time selection when date changes and set default valid time
+    if (option === 'today') {
+      // For today, set time to at least 30 minutes from now
+      const now = new Date();
+      const minTime = new Date(now.getTime() + 30 * 60 * 1000);
+      const hour = minTime.getHours();
+      const minute = minTime.getMinutes();
+      
+      // Convert to 12-hour format
+      let hour12 = hour;
+      let period: 'AM' | 'PM' = 'AM';
+      
+      if (hour === 0) {
+        hour12 = 12;
+      } else if (hour === 12) {
+        period = 'PM';
+      } else if (hour > 12) {
+        hour12 = hour - 12;
+        period = 'PM';
+      }
+      
+      setSelectedHour(hour12.toString().padStart(2, '0'));
+      setSelectedMinute(Math.ceil(minute / 5) * 5 >= 60 ? '00' : (Math.ceil(minute / 5) * 5).toString().padStart(2, '0')); // Round up to next 5-minute interval
+      setSelectedPeriod(period);
+    } else {
+      // For tomorrow, set default time
+      setSelectedHour('09');
+      setSelectedMinute('00');
+      setSelectedPeriod('AM');
+    }
+    
+    updateRideData('departureTime', '');
+    console.log('Time reset for new date');
+  };
+
+  const showCustomDatePicker = () => {
+    // This function is no longer needed since we removed custom date selection
   };
 
   const renderStep1 = () => (
@@ -228,15 +384,34 @@ export const PublishScreen: React.FC = () => {
       <View style={styles.dateSection}>
         <Text style={styles.sectionLabel}>Select Date</Text>
         <View style={styles.dateButtons}>
-          <TouchableOpacity style={[styles.dateButton, styles.selectedDateButton]}>
-            <Text style={[styles.dateButtonText, styles.selectedDateText]}>Today</Text>
+          <TouchableOpacity 
+            style={[
+              styles.dateButton, 
+              selectedDateOption === 'today' && styles.selectedDateButton
+            ]}
+            onPress={() => handleDateSelection('today')}
+          >
+            <Text style={[
+              styles.dateButtonText, 
+              selectedDateOption === 'today' && styles.selectedDateText
+            ]}>
+              Today
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.dateButton}>
-            <Text style={styles.dateButtonText}>Tomorrow</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.dateButton}>
-            <Ionicons name="calendar" size={16} color={colors.primary.main} />
-            <Text style={styles.dateButtonText}>Pick Date</Text>
+          
+          <TouchableOpacity 
+            style={[
+              styles.dateButton,
+              selectedDateOption === 'tomorrow' && styles.selectedDateButton
+            ]}
+            onPress={() => handleDateSelection('tomorrow')}
+          >
+            <Text style={[
+              styles.dateButtonText,
+              selectedDateOption === 'tomorrow' && styles.selectedDateText
+            ]}>
+              Tomorrow
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -244,26 +419,140 @@ export const PublishScreen: React.FC = () => {
       {/* Time Selection */}
       <View style={styles.timeSection}>
         <Text style={styles.sectionLabel}>Select Time</Text>
-        <View style={styles.timeGrid}>
-          {getTimeSlots().map((time) => (
-            <TouchableOpacity
-              key={time}
-              style={[
-                styles.timeSlot,
-                rideData.departureTime === time && styles.selectedTimeSlot,
-              ]}
-              onPress={() => updateRideData('departureTime', time)}
+        
+        {selectedDateOption === 'today' && (
+          <View style={styles.timeHelpContainer}>
+            <Ionicons name="information-circle" size={16} color={colors.special.orange} />
+            <Text style={styles.timeHelpText}>
+              You can only select times that are at least 30 minutes from now
+            </Text>
+          </View>
+        )}
+        
+        {/* Time Picker */}
+        <View style={styles.timePickerContainer}>
+          {/* Hours Picker */}
+          <View style={styles.timePickerSection}>
+            <Text style={styles.timePickerLabel}>Hour</Text>
+            <ScrollView 
+              style={styles.pickerScrollView}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.pickerContent}
             >
-              <Text
-                style={[
-                  styles.timeSlotText,
-                  rideData.departureTime === time && styles.selectedTimeSlotText,
-                ]}
-              >
-                {time}
-              </Text>
-            </TouchableOpacity>
-          ))}
+              {getHoursArray().map((hour) => {
+                const isValid = isTimeValid(hour, selectedMinute, selectedPeriod);
+                const isDisabled = selectedDateOption === 'today' && !isValid;
+                
+                return (
+                  <TouchableOpacity
+                    key={hour}
+                    style={[
+                      styles.timePickerOption,
+                      selectedHour === hour && styles.selectedTimePickerOption,
+                      isDisabled && styles.disabledTimePickerOption,
+                    ]}
+                    onPress={() => {
+                      if (!isDisabled) {
+                        setSelectedHour(hour);
+                        updateSelectedTime();
+                      }
+                    }}
+                    disabled={isDisabled}
+                  >
+                    <Text
+                      style={[
+                        styles.timePickerOptionText,
+                        selectedHour === hour && styles.selectedTimePickerOptionText,
+                        isDisabled && styles.disabledTimePickerOptionText,
+                      ]}
+                    >
+                      {hour}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Minutes Picker */}
+          <View style={styles.timePickerSection}>
+            <Text style={styles.timePickerLabel}>Minute</Text>
+            <ScrollView 
+              style={styles.pickerScrollView}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.pickerContent}
+            >
+              {getMinutesArray().map((minute) => {
+                const isValid = isTimeValid(selectedHour, minute, selectedPeriod);
+                const isDisabled = selectedDateOption === 'today' && !isValid;
+                
+                return (
+                  <TouchableOpacity
+                    key={minute}
+                    style={[
+                      styles.timePickerOption,
+                      selectedMinute === minute && styles.selectedTimePickerOption,
+                      isDisabled && styles.disabledTimePickerOption,
+                    ]}
+                    onPress={() => {
+                      if (!isDisabled) {
+                        setSelectedMinute(minute);
+                        updateSelectedTime();
+                      }
+                    }}
+                    disabled={isDisabled}
+                  >
+                    <Text
+                      style={[
+                        styles.timePickerOptionText,
+                        selectedMinute === minute && styles.selectedTimePickerOptionText,
+                        isDisabled && styles.disabledTimePickerOptionText,
+                      ]}
+                    >
+                      {minute}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* AM/PM Picker */}
+          <View style={styles.timePickerSection}>
+            <Text style={styles.timePickerLabel}>Period</Text>
+            <View style={styles.periodPickerWrapper}>
+              {['AM', 'PM'].map((period) => (
+                <TouchableOpacity
+                  key={period}
+                  style={[
+                    styles.periodPickerOption,
+                    selectedPeriod === period && styles.selectedPeriodPickerOption,
+                  ]}
+                  onPress={() => {
+                    setSelectedPeriod(period as 'AM' | 'PM');
+                    updateSelectedTime();
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.periodPickerOptionText,
+                      selectedPeriod === period && styles.selectedPeriodPickerOptionText,
+                    ]}
+                  >
+                    {period}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Selected Time Display */}
+        <View style={styles.selectedTimeDisplay}>
+          <Text style={styles.selectedTimeLabel}>Selected Time:</Text>
+          <Text style={styles.selectedTimeValue}>
+            {selectedHour}:{selectedMinute} {selectedPeriod}
+          </Text>
         </View>
       </View>
     </View>
@@ -340,7 +629,7 @@ export const PublishScreen: React.FC = () => {
         <View style={styles.reviewSection}>
           <Text style={styles.reviewLabel}>Departure</Text>
           <Text style={styles.reviewValue}>
-            Today at {rideData.departureTime}
+            {selectedDateOption === 'today' ? 'Today' : 'Tomorrow'} at {selectedHour}:{selectedMinute} {selectedPeriod}
           </Text>
         </View>
 
@@ -650,6 +939,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
+  timeHelpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.special.orange + '20',
+    padding: spacing.sm,
+    borderRadius: 8,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+
+  timeHelpText: {
+    fontSize: 12,
+    color: colors.special.orange,
+    fontWeight: '500',
+    flex: 1,
+  },
+
   timeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -766,5 +1072,148 @@ const styles = StyleSheet.create({
 
   nextButton: {
     width: '100%',
+  },
+
+  noTimeSlotsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    backgroundColor: colors.neutral[50],
+    borderRadius: 12,
+    marginTop: spacing.md,
+  },
+
+  noTimeSlotsText: {
+    fontSize: 14,
+    color: colors.neutral[600],
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+
+  // Time Picker Styles
+  timePickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+
+  timePickerSection: {
+    flex: 1,
+    alignItems: 'center',
+  },
+
+  timePickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.neutral[700],
+    marginBottom: spacing.sm,
+  },
+
+  pickerWrapper: {
+    maxHeight: 120,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.neutral[300],
+    backgroundColor: colors.neutral.white,
+  },
+
+  pickerScrollView: {
+    maxHeight: 120,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.neutral[300],
+    backgroundColor: colors.neutral.white,
+  },
+
+  pickerContent: {
+    flexGrow: 1,
+  },
+
+  timePickerOption: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[200],
+    alignItems: 'center',
+    minWidth: 60,
+  },
+
+  selectedTimePickerOption: {
+    backgroundColor: colors.primary.light,
+    borderBottomColor: colors.primary.main,
+  },
+
+  disabledTimePickerOption: {
+    backgroundColor: colors.neutral[100],
+    opacity: 0.5,
+  },
+
+  timePickerOptionText: {
+    fontSize: 16,
+    color: colors.neutral[700],
+    fontWeight: '500',
+  },
+
+  selectedTimePickerOptionText: {
+    color: colors.primary.main,
+    fontWeight: '600',
+  },
+
+  disabledTimePickerOptionText: {
+    color: colors.neutral[400],
+  },
+
+  periodPickerWrapper: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.neutral[300],
+    backgroundColor: colors.neutral.white,
+    overflow: 'hidden',
+  },
+
+  periodPickerOption: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    minWidth: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[200],
+  },
+
+  selectedPeriodPickerOption: {
+    backgroundColor: colors.primary.light,
+    borderBottomColor: colors.primary.main,
+  },
+
+  periodPickerOptionText: {
+    fontSize: 16,
+    color: colors.neutral[700],
+    fontWeight: '500',
+  },
+
+  selectedPeriodPickerOptionText: {
+    color: colors.primary.main,
+    fontWeight: '600',
+  },
+
+  selectedTimeDisplay: {
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.primary[50],
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+
+  selectedTimeLabel: {
+    fontSize: 14,
+    color: colors.neutral[600],
+    marginBottom: spacing.xs,
+  },
+
+  selectedTimeValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.primary.main,
   },
 });
