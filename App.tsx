@@ -9,7 +9,7 @@ export default function App() {
   return (
     <Provider store={store}>
       <AuthProvider>
-        <StatusBar style="auto" />
+        <StatusBar style="dark" backgroundColor="#f9fafb" translucent={false} />
         <AppNavigator />
       </AuthProvider>
     </Provider>
