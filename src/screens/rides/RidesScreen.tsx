@@ -389,7 +389,7 @@ export const RidesScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container}>
       {/* Tab Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Rides</Text>
@@ -502,7 +502,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    paddingTop: spacing.lg,
     backgroundColor: colors.neutral.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.neutral[200],
