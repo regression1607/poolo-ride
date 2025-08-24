@@ -227,14 +227,6 @@ export const SearchScreen: React.FC = () => {
                         Tomorrow
                       </Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.dateButton}
-                      onPress={() => Alert.alert('Date Picker', 'Custom date picker would open here')}
-                    >
-                      <Ionicons name="calendar" size={16} color={colors.primary.main} />
-                      <Text style={styles.dateButtonText}>Pick Date</Text>
-                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -484,7 +476,7 @@ const styles = StyleSheet.create({
 
   dateButtons: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
 
   dateButton: {
@@ -492,9 +484,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 8,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.neutral[300],
     backgroundColor: colors.neutral.white,
