@@ -102,6 +102,45 @@ export const db = {
   // Message operations
   messages: {
     create: (messageData: any) => supabase.from('ride_messages').insert(messageData).select(),
-    getByRide: (rideId: string) => supabase.from('ride_messages').select('*').eq('ride_id', rideId).order('sent_at', { ascending: true }),
+    getByRide: (rideId: string) => supabase.from('ride_messages').select(`
+      *,
+      sender:users!sender_id (
+        id,
+        name,
+        profile_picture
+      ),
+      receiver:users!receiver_id (
+        id,
+        name,
+        profile_picture
+      ),
+      ride:rides!ride_id (
+        id,
+        pickup_address,
+        drop_address,
+        pickup_time,
+        vehicle_type
+      )
+    `).eq('ride_id', rideId).order('sent_at', { ascending: true }),
+    getByUser: (userId: string) => supabase.from('ride_messages').select(`
+      *,
+      sender:users!sender_id (
+        id,
+        name,
+        profile_picture
+      ),
+      receiver:users!receiver_id (
+        id,
+        name,
+        profile_picture
+      ),
+      ride:rides!ride_id (
+        id,
+        pickup_address,
+        drop_address,
+        pickup_time,
+        vehicle_type
+      )
+    `).or(`sender_id.eq.${userId},receiver_id.eq.${userId}`).order('sent_at', { ascending: false }),
   },
 };

@@ -9,7 +9,7 @@ import { TabParamList } from '../types/navigation';
 import { SearchScreen } from '../screens/search/SearchScreen';
 import { PublishScreen } from '../screens/publish/PublishScreen';
 import { RidesScreen } from '../screens/rides/RidesScreen';
-import { InboxScreen } from '../screens/InboxScreen';
+import { InboxScreen } from '../screens/inbox/InboxScreen';
 import { ProfileNavigator } from './ProfileNavigator';
 
 const Tab = createBottomTabNavigator<TabParamList>();

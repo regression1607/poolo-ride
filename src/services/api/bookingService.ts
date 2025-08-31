@@ -1,4 +1,5 @@
 import { db } from '../database/supabaseClient';
+import { messageService } from './messageService';
 
 export interface CreateBookingData {
   rideId: string;
@@ -35,6 +36,43 @@ export interface RideBooking {
 
 class BookingService {
   /**
+   * Send automatic booking confirmation message to driver
+   */
+  private async sendBookingMessage(
+    booking: RideBooking,
+    rideData: any,
+    passengerName: string
+  ): Promise<void> {
+    try {
+      if (!rideData.driver?.id || !rideData.driver?.name) {
+        console.warn('Driver information not available for messaging');
+        return;
+      }
+
+      await messageService.sendBookingConfirmationMessage(
+        booking.ride_id,
+        booking.passenger_id,
+        rideData.driver.id,
+        passengerName,
+        rideData.driver.name,
+        {
+          pickupAddress: rideData.pickup_address,
+          dropAddress: rideData.drop_address,
+          pickupTime: rideData.pickup_time,
+          seatsBooked: booking.seats_booked,
+          totalPrice: booking.total_price,
+          vehicleType: rideData.vehicle_type,
+        }
+      );
+
+      console.log('Booking confirmation message sent successfully');
+    } catch (error) {
+      console.error('Failed to send booking confirmation message:', error);
+      // Don't throw error here as booking was successful, message is additional feature
+    }
+  }
+
+  /**
    * Create a new ride booking
    */
   async createBooking(bookingData: CreateBookingData): Promise<RideBooking> {
@@ -60,6 +98,15 @@ class BookingService {
       if (rideData.status !== 'available') {
         throw new Error('Ride is no longer available');
       }
+
+      // Get passenger information for messaging
+      const { data: passengerData, error: passengerError } = await db.users.getById(bookingData.passengerId);
+      
+      if (passengerError) {
+        console.warn('Failed to fetch passenger data:', passengerError);
+      }
+
+      const passengerName = passengerData?.name || 'Unknown Passenger';
 
       // Check if user already has a booking for this ride
       console.log('Checking for existing booking for ride:', bookingData.rideId, 'passenger:', bookingData.passengerId);
@@ -98,6 +145,10 @@ class BookingService {
 
           const updatedBooking = Array.isArray(updatedData) ? updatedData[0] : updatedData;
           console.log('Booking updated successfully:', updatedBooking);
+
+          // Send automatic message to driver
+          await this.sendBookingMessage(updatedBooking, rideData, passengerName);
+
           return updatedBooking as RideBooking;
         } else {
           // Booking already exists and is not cancelled
@@ -132,6 +183,9 @@ class BookingService {
 
       const createdBooking = Array.isArray(data) ? data[0] : data;
       console.log('Booking created successfully:', createdBooking);
+
+      // Send automatic message to driver
+      await this.sendBookingMessage(createdBooking, rideData, passengerName);
 
       return createdBooking as RideBooking;
     } catch (error) {

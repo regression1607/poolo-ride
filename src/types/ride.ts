@@ -60,11 +60,12 @@ export interface RideMessage {
   ride_id: string;
   sender_id: string;
   receiver_id: string;
-  message_text: string;
+  message: string;  // Changed from message_text to message
   message_type: MessageType;
   is_read: boolean;
   sent_at: string;
   sender?: User; // Populated when fetching with join
+  receiver?: User; // Added receiver info for conversations
 }
 
 export type MessageType = 'text' | 'image' | 'location';

@@ -1,148 +1,476 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  SafeAreaView,
+  FlatList,
   TouchableOpacity,
+  TextInput,
+  Alert,
+  Image,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme/colors';
+import { messageService, RideMessage } from '../../services/api/messageService';
+import { useAuth } from '../../contexts/AuthContext';
+
+interface ChatMessage {
+  id: string;
+  text: string;
+  timestamp: Date;
+  isFromUser: boolean;
+  status?: 'sent' | 'delivered' | 'read';
+}
 
 interface ChatConversation {
   id: string;
-  rideId: string;
-  partnerName: string;
+  participantName: string;
+  participantAvatar?: string;
+  participantRating: number;
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
-  route: string;
+  rideInfo: {
+    from: string;
+    to: string;
+    date: string;
+    time: string;
+  };
+  isOnline: boolean;
 }
 
 export const InboxScreen: React.FC = () => {
-  const insets = useSafeAreaInsets();
-  
-  // Mock chat conversations
-  const conversations: ChatConversation[] = [
-    {
-      id: '1',
-      rideId: 'ride1',
-      partnerName: 'Priya Singh',
-      lastMessage: 'Thanks for confirming! See you at 9 AM',
-      lastMessageTime: '2 mins ago',
-      unreadCount: 1,
-      route: 'Delhi → Gurgaon',
-    },
-    {
-      id: '2',
-      rideId: 'ride2',
-      partnerName: 'Amit Kumar',
-      lastMessage: 'Can we meet at the metro station instead?',
-      lastMessageTime: '1 hour ago',
-      unreadCount: 0,
-      route: 'Noida → Delhi',
-    },
-    {
-      id: '3',
-      rideId: 'ride3',
-      partnerName: 'Sarah Wilson',
-      lastMessage: 'Perfect! Looking forward to the ride',
-      lastMessageTime: 'Yesterday',
-      unreadCount: 0,
-      route: 'Gurgaon → Noida',
-    },
-  ];
+  const { user } = useAuth();
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [selectedChat, setSelectedChat] = useState<ChatConversation | null>(null);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleConversationPress = (conversation: ChatConversation) => {
-    console.log('Open chat with:', conversation.partnerName);
+  useEffect(() => {
+    if (user?.id) {
+      loadConversations();
+    }
+  }, [user]);
+
+  const loadConversations = async () => {
+    if (!user?.id) return;
+
+    try {
+      setIsLoading(true);
+      console.log('=== INBOX: Loading conversations ===');
+      
+      const userMessages = await messageService.getConversationsForUser(user.id);
+      console.log('Raw messages fetched:', userMessages.length);
+
+      // Group messages by ride and conversation partner
+      const conversationsMap = new Map<string, ChatConversation>();
+
+      userMessages.forEach((message: any) => {
+        const isUserSender = message.sender_id === user.id;
+        const conversationPartner = isUserSender ? message.receiver : message.sender;
+        const conversationKey = `${message.ride_id}___${conversationPartner?.id}`;
+
+        if (!conversationPartner) return;
+
+        if (!conversationsMap.has(conversationKey)) {
+          conversationsMap.set(conversationKey, {
+            id: conversationKey,
+            participantName: conversationPartner.name || 'Unknown User',
+            participantAvatar: conversationPartner.profile_picture,
+            participantRating: 5.0, // Default rating
+            lastMessage: message.message,
+            lastMessageTime: new Date(message.sent_at).toLocaleDateString(),
+            unreadCount: isUserSender ? 0 : (message.is_read ? 0 : 1),
+            rideInfo: {
+              from: message.ride?.pickup_address || 'Unknown',
+              to: message.ride?.drop_address || 'Unknown',
+              date: new Date(message.ride?.pickup_time || message.sent_at).toLocaleDateString(),
+              time: new Date(message.ride?.pickup_time || message.sent_at).toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              }),
+            },
+            isOnline: false, // We don't have online status yet
+          });
+        } else {
+          // Update with latest message if this is newer
+          const existing = conversationsMap.get(conversationKey)!;
+          if (new Date(message.sent_at) > new Date(existing.lastMessageTime)) {
+            existing.lastMessage = message.message;
+            existing.lastMessageTime = new Date(message.sent_at).toLocaleDateString();
+            if (!isUserSender && !message.is_read) {
+              existing.unreadCount += 1;
+            }
+          }
+        }
+      });
+
+      setConversations(Array.from(conversationsMap.values()));
+      console.log('Conversations processed:', conversationsMap.size);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      Alert.alert('Error', 'Failed to load conversations. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const renderConversationItem = (conversation: ChatConversation) => (
+    const handleSelectChat = async (conversation: any) => {
+    const [rideId, contactUserId] = conversation.id.split('___');
+    setSelectedChat(conversation);
+    setSelectedChatId(conversation.id);
+    
+    try {
+      const messages = await messageService.getMessagesByRide(rideId);
+      // Convert RideMessage to ChatMessage format
+      const chatMessages: ChatMessage[] = messages.map(msg => ({
+        id: msg.id,
+        text: msg.message,
+        timestamp: new Date(msg.sent_at),
+        isFromUser: msg.sender_id === user?.id,
+        status: 'sent' as const,
+      }));
+      setMessages(chatMessages);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedChatId || !user?.id) return;
+
+    const messageText = newMessage.trim();
+    setNewMessage('');
+
+    try {
+      // Extract ride ID and receiver ID from conversation
+      const [rideId, receiverId] = selectedChatId!.split('___');
+      
+      // Send message through service
+      await messageService.sendMessage({
+        rideId,
+        senderId: user.id,
+        receiverId,
+        message: messageText,
+        messageType: 'text',
+      });
+
+      // Add message to local state for immediate feedback
+      const message: ChatMessage = {
+        id: Date.now().toString(),
+        text: messageText,
+        timestamp: new Date(),
+        isFromUser: true,
+        status: 'sent',
+      };
+
+      setMessages(prev => [...prev, message]);
+
+      // Update last message in conversation
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === selectedChatId
+            ? { ...conv, lastMessage: messageText, lastMessageTime: 'now' }
+            : conv
+        )
+      );
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Error', 'Failed to send message. Please try again.');
+      // Restore the message text so user can try again
+      setNewMessage(messageText);
+    }
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const getMessageStatusIcon = (status?: string) => {
+    switch (status) {
+      case 'sent':
+        return <Ionicons name="checkmark" size={14} color={colors.neutral[400]} />;
+      case 'delivered':
+        return <Ionicons name="checkmark-done" size={14} color={colors.neutral[400]} />;
+      case 'read':
+        return <Ionicons name="checkmark-done" size={14} color={colors.primary.main} />;
+      default:
+        return null;
+    }
+  };
+
+  const renderConversationItem = ({ item }: { item: ChatConversation }) => (
     <TouchableOpacity
-      key={conversation.id}
       style={styles.conversationItem}
-      onPress={() => handleConversationPress(conversation)}
+      onPress={() => handleSelectChat(item)}
     >
       <View style={styles.avatarContainer}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
-            {conversation.partnerName.charAt(0).toUpperCase()}
+            {item.participantName.charAt(0).toUpperCase()}
           </Text>
         </View>
-        {conversation.unreadCount > 0 && (
-          <View style={styles.onlineIndicator} />
-        )}
+        {item.isOnline && <View style={styles.onlineIndicator} />}
       </View>
 
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
-          <Text style={styles.partnerName}>{conversation.partnerName}</Text>
-          <Text style={styles.timestamp}>{conversation.lastMessageTime}</Text>
+          <Text style={styles.participantName}>{item.participantName}</Text>
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={12} color={colors.special.gold} />
+            <Text style={styles.ratingText}>{item.participantRating}</Text>
+          </View>
+          <Text style={styles.messageTime}>{item.lastMessageTime}</Text>
         </View>
-        
-        <Text style={styles.route}>{conversation.route}</Text>
-        
-        <View style={styles.lastMessageContainer}>
-          <Text
-            style={[
-              styles.lastMessage,
-              conversation.unreadCount > 0 && styles.unreadMessage,
-            ]}
-            numberOfLines={1}
-          >
-            {conversation.lastMessage}
+
+        <View style={styles.rideInfo}>
+          <Text style={styles.rideRoute}>
+            {item.rideInfo.from} → {item.rideInfo.to}
           </Text>
-          {conversation.unreadCount > 0 && (
+          <Text style={styles.rideTime}>
+            {item.rideInfo.date} at {item.rideInfo.time}
+          </Text>
+        </View>
+
+        <View style={styles.lastMessageContainer}>
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {item.lastMessage}
+          </Text>
+          {item.unreadCount > 0 && (
             <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{conversation.unreadCount}</Text>
+              <Text style={styles.unreadCount}>{item.unreadCount}</Text>
             </View>
           )}
         </View>
       </View>
-
-      <Ionicons
-        name="chevron-forward"
-        size={16}
-        color={colors.neutral[400]}
-      />
     </TouchableOpacity>
   );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Ionicons
-        name="chatbubbles-outline"
-        size={64}
-        color={colors.neutral[400]}
+  const renderMessage = ({ item }: { item: ChatMessage }) => (
+    <View
+      style={[
+        styles.messageContainer,
+        item.isFromUser ? styles.userMessage : styles.otherMessage,
+      ]}
+    >
+      <View
+        style={[
+          styles.messageBubble,
+          item.isFromUser ? styles.userBubble : styles.otherBubble,
+        ]}
+      >
+        <Text
+          style={[
+            styles.messageText,
+            item.isFromUser ? styles.userMessageText : styles.otherMessageText,
+          ]}
+        >
+          {item.text}
+        </Text>
+      </View>
+      <View style={styles.messageInfo}>
+        <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+        {item.isFromUser && getMessageStatusIcon(item.status)}
+      </View>
+    </View>
+  );
+
+  const renderChatView = () => (
+    <View style={styles.chatContainer}>
+      {/* Chat Header */}
+      <View style={styles.chatHeader}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setSelectedChat(null)}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
+        </TouchableOpacity>
+
+        <View style={styles.chatHeaderInfo}>
+          <View style={styles.chatAvatar}>
+            <Text style={styles.chatAvatarText}>
+              {selectedChat?.participantName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View>
+            <Text style={styles.chatParticipantName}>
+              {selectedChat?.participantName}
+            </Text>
+            <Text style={styles.chatStatus}>
+              {selectedChat?.isOnline ? 'Online' : 'Last seen recently'}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.callButton}>
+          <Ionicons name="call" size={20} color={colors.primary.main} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Ride Info Banner */}
+      <View style={styles.rideInfoBanner}>
+        <View style={styles.rideDetails}>
+          <Text style={styles.rideRoute}>
+            {selectedChat?.rideInfo.from} → {selectedChat?.rideInfo.to}
+          </Text>
+          <Text style={styles.rideDateTime}>
+            {selectedChat?.rideInfo.date} at {selectedChat?.rideInfo.time}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.viewRideButton}>
+          <Text style={styles.viewRideText}>View Ride</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Messages */}
+      <FlatList
+        data={messages}
+        renderItem={renderMessage}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.messagesList}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyMessages}>
+            <Ionicons name="chatbubble-outline" size={48} color={colors.neutral[400]} />
+            <Text style={styles.emptyMessagesText}>No messages yet</Text>
+            <Text style={styles.emptyMessagesSubtext}>Start the conversation!</Text>
+          </View>
+        }
       />
-      <Text style={styles.emptyStateTitle}>No messages yet</Text>
-      <Text style={styles.emptyStateSubtitle}>
-        When you book or publish rides, you can chat with other riders here
-      </Text>
+
+      {/* Message Input */}
+      <View style={styles.messageInputContainer}>
+        <TextInput
+          style={styles.messageInput}
+          placeholder="Type a message..."
+          value={newMessage}
+          onChangeText={setNewMessage}
+          multiline
+          maxLength={500}
+        />
+        <TouchableOpacity
+          style={[
+            styles.sendButton,
+            newMessage.trim() ? styles.sendButtonActive : {},
+          ]}
+          onPress={handleSendMessage}
+          disabled={!newMessage.trim()}
+        >
+          <Ionicons
+            name="send"
+            size={20}
+            color={newMessage.trim() ? colors.neutral.white : colors.neutral[400]}
+          />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderConversationsList = () => (
+    <View style={styles.container}>
+
+
+            <FlatList
+        data={conversations}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.conversationItem}
+            onPress={() => handleSelectChat(item)}
+          >
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {item.participantName.split(' ').map((n: string) => n[0]).join('')}
+                </Text>
+              </View>
+              {item.isOnline && (
+                <View style={styles.onlineIndicator} />
+              )}
+            </View>
+
+            <View style={styles.conversationContent}>
+              <View style={styles.conversationHeader}>
+                <Text style={styles.participantName}>
+                  {item.participantName}
+                </Text>
+                <View style={styles.ratingContainer}>
+                  <Ionicons name="star" size={12} color={colors.status.warning} />
+                  <Text style={styles.ratingText}>
+                    {item.participantRating}
+                  </Text>
+                </View>
+                <Text style={styles.messageTime}>
+                  {item.lastMessageTime}
+                </Text>
+              </View>
+
+              <Text style={styles.lastMessage} numberOfLines={1}>
+                {item.lastMessage}
+              </Text>
+
+              <View style={styles.rideInfo}>
+                <Text style={styles.rideRoute} numberOfLines={1}>
+                  {item.rideInfo.from} → {item.rideInfo.to}
+                </Text>
+                <Text style={styles.rideDateTime}>
+                  {item.rideInfo.date} • {item.rideInfo.time}
+                </Text>
+              </View>
+            </View>
+
+            {item.unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadCount}>
+                  {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.conversationsList}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={loadConversations}
+            colors={[colors.primary.main]}
+            tintColor={colors.primary.main}
+          />
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={colors.primary.main} />
+              <Text style={styles.loadingText}>Loading conversations...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="chatbubble-outline" size={64} color={colors.neutral[400]} />
+              <Text style={styles.emptyStateTitle}>No conversations yet</Text>
+              <Text style={styles.emptyStateSubtitle}>
+                Start by booking a ride or publishing one to connect with other users
+              </Text>
+            </View>
+          )
+        }
+      />
     </View>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search" size={24} color={colors.neutral[700]} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {conversations.length > 0 ? (
-          <View style={styles.conversationsList}>
-            {conversations.map(renderConversationItem)}
-          </View>
-        ) : (
-          renderEmptyState()
-        )}
-      </ScrollView>
-    </View>
+    <SafeAreaView style={styles.container}>
+      {selectedChat ? renderChatView() : renderConversationsList()}
+    </SafeAreaView>
   );
 };
 
@@ -151,65 +479,52 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.neutral[50],
   },
-
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     backgroundColor: colors.neutral.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.neutral[200],
   },
-
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
     color: colors.neutral[900],
   },
-
   searchButton: {
     padding: spacing.xs,
   },
-
-  scrollView: {
-    flex: 1,
-  },
-
   conversationsList: {
-    paddingVertical: spacing.sm,
+    paddingBottom: spacing.xl,
   },
-
   conversationItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.neutral.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.neutral[100],
   },
-
   avatarContainer: {
     position: 'relative',
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
   },
-
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary[100],
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.primary.light,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   avatarText: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.primary.main,
   },
-
   onlineIndicator: {
     position: 'absolute',
     bottom: 2,
@@ -221,54 +536,57 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.neutral.white,
   },
-
   conversationContent: {
     flex: 1,
   },
-
   conversationHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: spacing.xs,
   },
-
-  partnerName: {
+  participantName: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.neutral[900],
+    flex: 1,
   },
-
-  timestamp: {
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginRight: spacing.sm,
+  },
+  ratingText: {
+    fontSize: 12,
+    color: colors.neutral[600],
+    fontWeight: '500',
+  },
+  messageTime: {
     fontSize: 12,
     color: colors.neutral[500],
   },
-
-  route: {
-    fontSize: 12,
-    color: colors.primary.main,
-    fontWeight: '500',
+  rideInfo: {
     marginBottom: spacing.xs,
   },
-
+  rideRoute: {
+    fontSize: 13,
+    color: colors.neutral[600],
+    fontWeight: '500',
+  },
+  rideTime: {
+    fontSize: 11,
+    color: colors.neutral[500],
+  },
   lastMessageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-
   lastMessage: {
     fontSize: 14,
     color: colors.neutral[600],
     flex: 1,
-    marginRight: spacing.sm,
   },
-
-  unreadMessage: {
-    color: colors.neutral[900],
-    fontWeight: '500',
-  },
-
   unreadBadge: {
     backgroundColor: colors.primary.main,
     borderRadius: 10,
@@ -277,34 +595,209 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
+    marginLeft: spacing.sm,
   },
-
   unreadCount: {
     fontSize: 12,
     fontWeight: '600',
     color: colors.neutral.white,
   },
-
-  emptyState: {
+  chatContainer: {
+    flex: 1,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.neutral.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[200],
+  },
+  backButton: {
+    marginRight: spacing.sm,
+  },
+  chatHeaderInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chatAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary.light,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  chatAvatarText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary.main,
+  },
+  chatParticipantName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.neutral[900],
+  },
+  chatStatus: {
+    fontSize: 12,
+    color: colors.neutral[500],
+  },
+  callButton: {
+    padding: spacing.xs,
+  },
+  rideInfoBanner: {
+    flexDirection: 'row',
+    backgroundColor: colors.primary.light,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[200],
+  },
+  rideDetails: {
+    flex: 1,
+  },
+  rideDateTime: {
+    fontSize: 12,
+    color: colors.neutral[600],
+    marginTop: 2,
+  },
+  viewRideButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  viewRideText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary.main,
+  },
+  messagesList: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  messageContainer: {
+    marginVertical: spacing.xs,
+    alignItems: 'flex-end',
+  },
+  userMessage: {
+    alignItems: 'flex-end',
+  },
+  otherMessage: {
+    alignItems: 'flex-start',
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 18,
+  },
+  userBubble: {
+    backgroundColor: colors.primary.main,
+    borderBottomRightRadius: 4,
+  },
+  otherBubble: {
+    backgroundColor: colors.neutral[200],
+    borderBottomLeftRadius: 4,
+  },
+  messageText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  userMessageText: {
+    color: colors.neutral.white,
+  },
+  otherMessageText: {
+    color: colors.neutral[900],
+  },
+  messageInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: 2,
+    paddingHorizontal: spacing.xs,
+  },
+  emptyMessages: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing['4xl'],
-    paddingHorizontal: spacing.lg,
   },
-
+  emptyMessagesText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.neutral[600],
+    marginTop: spacing.sm,
+  },
+  emptyMessagesSubtext: {
+    fontSize: 14,
+    color: colors.neutral[500],
+    marginTop: spacing.xs,
+  },
+  messageInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: colors.neutral.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[200],
+  },
+  messageInput: {
+    flex: 1,
+    backgroundColor: colors.neutral[100],
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    maxHeight: 100,
+    fontSize: 14,
+    color: colors.neutral[900],
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.neutral[300],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.sm,
+  },
+  sendButtonActive: {
+    backgroundColor: colors.primary.main,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing['5xl'],
+  },
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.neutral[700],
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
     textAlign: 'center',
   },
-
   emptyStateSubtitle: {
     fontSize: 14,
     color: colors.neutral[500],
     textAlign: 'center',
     lineHeight: 20,
+  },
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing['3xl'],
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.neutral[600],
+    marginTop: spacing.md,
   },
 });
