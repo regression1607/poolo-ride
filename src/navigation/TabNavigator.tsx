@@ -1,4 +1,5 @@
 import React from 'react';
+import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
@@ -101,7 +102,7 @@ export const TabNavigator: React.FC = () => {
         options={{
           title: 'Inbox',
           headerTitle: '💬 Messages',
-          headerShown: false,
+          headerShown: true,
         }}
       />
       <Tab.Screen

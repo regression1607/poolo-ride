@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '../../theme/colors';
+import { colors, spacing } from '../../theme/colors';
 
 interface ChatConversation {
   id: string;
@@ -21,6 +21,8 @@ interface ChatConversation {
 }
 
 export const InboxScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  
   // Mock chat conversations
   const conversations: ChatConversation[] = [
     {
@@ -122,7 +124,15 @@ export const InboxScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Messages</Text>
+        <TouchableOpacity style={styles.searchButton}>
+          <Ionicons name="search" size={24} color={colors.neutral[700]} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {conversations.length > 0 ? (
           <View style={styles.conversationsList}>
@@ -132,14 +142,35 @@ export const InboxScreen: React.FC = () => {
           renderEmptyState()
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.neutral[50],
+  },
+
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     backgroundColor: colors.neutral.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[200],
+  },
+
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.neutral[900],
+  },
+
+  searchButton: {
+    padding: spacing.xs,
   },
 
   scrollView: {

@@ -282,12 +282,7 @@ export const InboxScreen: React.FC = () => {
 
   const renderConversationsList = () => (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search" size={24} color={colors.neutral[700]} />
-        </TouchableOpacity>
-      </View>
+
 
       <FlatList
         data={conversations}
