@@ -15,6 +15,7 @@ import { colors, spacing } from '../../theme/colors';
 import { Button } from '../../components/common/Button';
 import { VehicleType, RideStatus, BookingStatus, Ride } from '../../types/ride';
 import { rideService } from '../../services/api/rideService';
+import { bookingService, RideBooking } from '../../services/api/bookingService';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface RideData {
@@ -35,6 +36,7 @@ interface RideData {
   passengerRating?: number;
   bookingRequests?: BookingRequest[];
   canCancel: boolean;
+  pickupDateTime: Date; // Add for sorting
 }
 
 interface BookingRequest {
@@ -52,6 +54,7 @@ export const RidesScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'published' | 'booked'>('published');
   const [rides, setRides] = useState<RideData[]>([]);
   const [publishedRides, setPublishedRides] = useState<Ride[]>([]);
+  const [bookedRides, setBookedRides] = useState<RideBooking[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -68,7 +71,7 @@ export const RidesScreen: React.FC = () => {
 
     try {
       setIsLoading(true);
-      console.log('=== RIDES SCREEN: Loading published rides ===');
+      console.log('=== RIDES SCREEN: Loading rides and bookings ===');
       console.log('User ID:', user.id);
 
       // Fetch published rides by the current user
@@ -76,6 +79,12 @@ export const RidesScreen: React.FC = () => {
       console.log('Published rides fetched:', userPublishedRides.length);
       
       setPublishedRides(userPublishedRides);
+
+      // Fetch booked rides (rides where user is a passenger)
+      const userBookings = await bookingService.getBookingsByPassenger(user.id);
+      console.log('User bookings fetched:', userBookings.length);
+      
+      setBookedRides(userBookings);
 
       // Convert published rides to RideData format for display
       const formattedPublishedRides: RideData[] = userPublishedRides.map(ride => ({
@@ -91,12 +100,34 @@ export const RidesScreen: React.FC = () => {
         vehicleType: ride.vehicle_type,
         status: ride.status,
         canCancel: ride.status === 'available',
+        pickupDateTime: new Date(ride.pickup_time), // Add for sorting
       }));
 
-      // TODO: Fetch booked rides (rides where user is a passenger)
-      const bookedRides: RideData[] = [];
+      // Convert booked rides to RideData format for display
+      const formattedBookedRides: RideData[] = userBookings
+        .filter(booking => booking.ride) // Ensure ride data exists
+        .map(booking => ({
+          id: booking.id, // Use booking ID as the card ID
+          type: 'booked' as const,
+          from: booking.ride!.pickup_address,
+          to: booking.ride!.drop_address,
+          date: new Date(booking.ride!.pickup_time).toLocaleDateString(),
+          time: new Date(booking.ride!.pickup_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          seats: booking.seats_booked,
+          price: booking.total_price,
+          vehicleType: booking.ride!.vehicle_type as VehicleType,
+          status: booking.booking_status as BookingStatus,
+          driverName: booking.ride!.driver?.name || 'Unknown Driver',
+          driverRating: booking.ride!.driver?.rating || 5.0,
+          canCancel: booking.booking_status === 'confirmed' || booking.booking_status === 'pending',
+          pickupDateTime: new Date(booking.ride!.pickup_time), // Add for sorting
+        }));
 
-      setRides([...formattedPublishedRides, ...bookedRides]);
+      // Sort both arrays by pickup date (most recent first)
+      formattedPublishedRides.sort((a, b) => b.pickupDateTime.getTime() - a.pickupDateTime.getTime());
+      formattedBookedRides.sort((a, b) => b.pickupDateTime.getTime() - a.pickupDateTime.getTime());
+
+      setRides([...formattedPublishedRides, ...formattedBookedRides]);
       
     } catch (error) {
       console.error('Error loading rides:', error);
@@ -113,6 +144,10 @@ export const RidesScreen: React.FC = () => {
   };
 
   const filteredRides = rides.filter(ride => ride.type === activeTab);
+
+  // Calculate notification counts
+  const availablePublishedRides = rides.filter(ride => ride.type === 'published' && ride.status === 'available').length;
+  const confirmedBookedRides = rides.filter(ride => ride.type === 'booked' && ride.status === 'confirmed').length;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -214,6 +249,9 @@ export const RidesScreen: React.FC = () => {
             if (rideType === 'published') {
               // Update ride status in database
               await rideService.updateRideStatus(rideId, 'cancelled');
+            } else {
+              // Cancel booking - update booking status
+              await bookingService.cancelBooking(rideId); // rideId here is actually bookingId for booked rides
             }
             
             // Update local state
@@ -224,7 +262,7 @@ export const RidesScreen: React.FC = () => {
             Alert.alert('Success', `${rideType === 'published' ? 'Ride' : 'Booking'} cancelled successfully.`);
           } catch (error) {
             console.error('Error cancelling ride:', error);
-            Alert.alert('Error', 'Failed to cancel ride. Please try again.');
+            Alert.alert('Error', `Failed to cancel ${rideType === 'published' ? 'ride' : 'booking'}. Please try again.`);
           }
         },
       },
@@ -322,7 +360,7 @@ export const RidesScreen: React.FC = () => {
         <View style={styles.priceInfo}>
           <Text style={styles.priceText}>₹{item.price}</Text>
           <Text style={styles.priceLabel}>
-            {item.type === 'published' ? 'per seat' : `for ${item.seats} seat${item.seats > 1 ? 's' : ''}`}
+            {item.type === 'published' ? 'per seat' : 'total cost'}
           </Text>
         </View>
       </View>
@@ -331,6 +369,14 @@ export const RidesScreen: React.FC = () => {
         <View style={styles.seatsInfo}>
           <Text style={styles.seatsText}>
             {item.availableSeats} of {item.seats} seats available
+          </Text>
+        </View>
+      )}
+
+      {item.type === 'booked' && (
+        <View style={styles.seatsInfo}>
+          <Text style={styles.seatsText}>
+            {item.seats} seat{item.seats > 1 ? 's' : ''} booked
           </Text>
         </View>
       )}
@@ -396,7 +442,9 @@ export const RidesScreen: React.FC = () => {
         <Text style={styles.headerTitle}>My Rides</Text>
         <TouchableOpacity style={styles.notificationButton}>
           <Ionicons name="notifications" size={24} color={colors.neutral[700]} />
-          <View style={styles.notificationDot} />
+          {(availablePublishedRides > 0 || confirmedBookedRides > 0) && (
+            <View style={styles.notificationDot} />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -419,10 +467,10 @@ export const RidesScreen: React.FC = () => {
           >
             Published
           </Text>
-          {rides.filter(r => r.type === 'published').length > 0 && (
+          {availablePublishedRides > 0 && (
             <View style={styles.tabBadge}>
               <Text style={styles.tabBadgeText}>
-                {rides.filter(r => r.type === 'published').length}
+                {availablePublishedRides}
               </Text>
             </View>
           )}
@@ -445,10 +493,10 @@ export const RidesScreen: React.FC = () => {
           >
             Booked
           </Text>
-          {rides.filter(r => r.type === 'booked').length > 0 && (
+          {confirmedBookedRides > 0 && (
             <View style={styles.tabBadge}>
               <Text style={styles.tabBadgeText}>
-                {rides.filter(r => r.type === 'booked').length}
+                {confirmedBookedRides}
               </Text>
             </View>
           )}

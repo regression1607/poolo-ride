@@ -16,6 +16,21 @@ export interface RideBooking {
   booking_status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   booked_at: string;
   updated_at: string;
+  ride?: {
+    id: string;
+    pickup_address: string;
+    drop_address: string;
+    pickup_time: string;
+    vehicle_type: string;
+    price_per_seat: number;
+    status: string;
+    driver?: {
+      id: string;
+      name: string;
+      rating: number;
+      profile_picture?: string;
+    };
+  };
 }
 
 class BookingService {

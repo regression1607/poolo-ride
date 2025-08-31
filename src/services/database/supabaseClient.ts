@@ -78,7 +78,18 @@ export const db = {
   bookings: {
     create: (bookingData: any) => supabase.from('ride_bookings').insert(bookingData).select(),
     getByRide: (rideId: string) => supabase.from('ride_bookings').select('*').eq('ride_id', rideId),
-    getByPassenger: (passengerId: string) => supabase.from('ride_bookings').select('*').eq('passenger_id', passengerId),
+    getByPassenger: (passengerId: string) => supabase.from('ride_bookings').select(`
+      *,
+      ride:rides!ride_id (
+        *,
+        driver:users!driver_id (
+          id,
+          name,
+          rating,
+          profile_picture
+        )
+      )
+    `).eq('passenger_id', passengerId),
     update: (id: string, updates: any) => supabase.from('ride_bookings').update(updates).eq('id', id).select(),
   },
   
