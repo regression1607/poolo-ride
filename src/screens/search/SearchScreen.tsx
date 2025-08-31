@@ -18,7 +18,8 @@ import { Button } from '../../components/common/Button';
 import { SeatSelector } from '../../components/ride-specific/SeatSelector';
 import { VehicleTypeSelector } from '../../components/ride-specific/VehicleTypeSelector';
 import { SearchRideCard } from '../../components/ride-specific/SearchRideCard';
-import { VehicleType } from '../../types/ride';
+import { VehicleType, Ride } from '../../types/ride';
+import { rideService } from '../../services/api/rideService';
 
 interface SearchRide {
   id: string;
@@ -63,20 +64,110 @@ export const SearchScreen: React.FC = () => {
     }
   };
 
-  const handleSearch = () => {
+  // Convert Ride to SearchRide format for display
+  const convertRideToSearchRide = (ride: Ride): SearchRide => {
+    const departureDate = new Date(ride.pickup_time);
+    
+    return {
+      id: ride.id,
+      driverName: ride.driver?.name || 'Driver',
+      driverRating: ride.driver?.rating || 5.0,
+      vehicleType: ride.vehicle_type,
+      vehicleModel: `${ride.vehicle_type.charAt(0).toUpperCase() + ride.vehicle_type.slice(1)}`,
+      departureTime: departureDate.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }),
+      pickupLocation: ride.pickup_address,
+      dropLocation: ride.drop_address,
+      availableSeats: ride.available_seats,
+      pricePerSeat: ride.price_per_seat,
+      estimatedDuration: '45 mins', // Default duration - in real app, calculate from distance
+      driverImage: ride.driver?.profile_picture_url,
+    };
+  };
+
+  // Filter rides based on search criteria
+  const filterRides = (rides: Ride[]): Ride[] => {
+    return rides.filter(ride => {
+      // Check if ride has enough available seats
+      if (ride.available_seats < seatsNeeded) {
+        return false;
+      }
+
+      // Check vehicle type preference (optional filter)
+      if (vehicleType && vehicleType !== 'car' && ride.vehicle_type !== vehicleType) {
+        return false;
+      }
+
+      // Check location matching (basic string matching)
+      const pickupMatch = fromLocation === '' || 
+        ride.pickup_address.toLowerCase().includes(fromLocation.toLowerCase()) ||
+        fromLocation.toLowerCase().includes(ride.pickup_address.toLowerCase());
+      
+      const dropMatch = toLocation === '' || 
+        ride.drop_address.toLowerCase().includes(toLocation.toLowerCase()) ||
+        toLocation.toLowerCase().includes(ride.drop_address.toLowerCase());
+
+      // Check date matching
+      const rideDate = new Date(ride.pickup_time);
+      const searchDate = selectedDate;
+      
+      // Compare dates (same day)
+      const dateMatch = rideDate.toDateString() === searchDate.toDateString();
+
+      return pickupMatch && dropMatch && dateMatch;
+    });
+  };
+
+  const handleSearch = async () => {
     if (!fromLocation || !toLocation) {
       Alert.alert('Missing Information', 'Please select both pickup and drop locations');
       return;
     }
 
-    setIsLoading(true);
-    
-    // TODO: Replace with actual API call to search for rides
-    setTimeout(() => {
-      setSearchResults([]); // Start with empty results - no mock data
+    try {
+      setIsLoading(true);
+      console.log('=== SEARCH SCREEN: Starting ride search ===');
+      console.log('Search criteria:', {
+        fromLocation,
+        toLocation,
+        seatsNeeded,
+        vehicleType,
+        selectedDate: selectedDate.toDateString(),
+      });
+
+      // Fetch all available rides from the service
+      const availableRides = await rideService.getAvailableRides();
+      console.log('Available rides fetched:', availableRides.length);
+
+      // Filter rides based on search criteria
+      const filteredRides = filterRides(availableRides);
+      console.log('Filtered rides:', filteredRides.length);
+
+      // Convert to SearchRide format for display
+      const searchRideResults = filteredRides.map(convertRideToSearchRide);
+      
+      setSearchResults(searchRideResults);
       setShowResults(true);
+      
+      console.log('Search completed, showing', searchRideResults.length, 'results');
+
+    } catch (error) {
+      console.error('Search error:', error);
+      
+      let errorMessage = 'Failed to search for rides. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Search Failed', errorMessage);
+      setSearchResults([]);
+      setShowResults(true);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleDateSelect = (days: number) => {
@@ -250,108 +341,6 @@ export const SearchScreen: React.FC = () => {
                   size="large"
                   style={styles.searchButton}
                   disabled={isLoading}
-                />
-              </View>
-
-              {/* Quick Options */}
-              <View style={styles.quickOptions}>
-                <Text style={styles.quickOptionsTitle}>Popular routes</Text>
-                <View style={styles.routeChips}>
-                  <TouchableOpacity 
-                    style={styles.routeChip}
-                    onPress={() => {
-                      setFromLocation('Connaught Place, New Delhi');
-                      setToLocation('Cyber City, Gurgaon');
-                    }}
-                  >
-                    <Text style={styles.routeChipText}>Delhi → Gurgaon</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.routeChip}
-                    onPress={() => {
-                      setFromLocation('Noida Sector 18');
-                      setToLocation('Connaught Place, New Delhi');
-                    }}
-                  >
-                    <Text style={styles.routeChipText}>Noida → Delhi</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.routeChip}
-                    onPress={() => {
-                      setFromLocation('DLF Phase 1, Gurgaon');
-                      setToLocation('Noida Sector 62');
-                    }}
-                  >
-                    <Text style={styles.routeChipText}>Gurgaon → Noida</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </ScrollView>
-        </LinearGradient>
-      </ImageBackground>
-    </SafeAreaView>
-  );
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <ImageBackground
-        source={{
-          uri: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80'
-        }}
-        style={styles.backgroundImage}
-      >
-        <LinearGradient
-          colors={['rgba(59, 130, 246, 0.8)', 'rgba(99, 102, 241, 0.6)', 'rgba(255, 255, 255, 0.95)']}
-          style={styles.gradient}
-        >
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <View style={styles.content}>
-              {/* Welcome Message */}
-              <View style={styles.welcomeSection}>
-                <Text style={styles.welcomeTitle}>Find your perfect ride</Text>
-                <Text style={styles.welcomeSubtitle}>
-                  Share costs, reduce traffic, make friends!
-                </Text>
-              </View>
-
-              {/* Search Form */}
-              <View style={styles.searchForm}>
-                <LocationPicker
-                  placeholder="From: Pickup location"
-                  value={fromLocation}
-                  onLocationSelect={setFromLocation}
-                  icon="radio-button-on"
-                />
-
-                <LocationPicker
-                  placeholder="To: Drop location"
-                  value={toLocation}
-                  onLocationSelect={setToLocation}
-                  icon="location"
-                />
-
-                <SeatSelector
-                  value={seatsNeeded}
-                  onChange={setSeatsNeeded}
-                  label="Seats needed"
-                  maxSeats={4}
-                />
-
-                <VehicleTypeSelector
-                  value={vehicleType}
-                  onChange={setVehicleType}
-                  label="Preferred vehicle type"
-                />
-
-                <Button
-                  title="🔍 Search Rides"
-                  onPress={handleSearch}
-                  variant="primary"
-                  size="large"
-                  style={styles.searchButton}
                 />
               </View>
 
