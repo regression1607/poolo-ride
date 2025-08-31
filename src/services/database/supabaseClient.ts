@@ -30,11 +30,43 @@ export const db = {
   // Ride operations
   rides: {
     create: (rideData: any) => supabase.from('rides').insert(rideData).select(),
-    getAll: () => supabase.from('rides').select('*'),
-    getById: (id: string) => supabase.from('rides').select('*').eq('id', id).single(),
-    getByDriver: (driverId: string) => supabase.from('rides').select('*').eq('driver_id', driverId),
+    getAll: () => supabase.from('rides').select(`
+      *,
+      driver:users!driver_id (
+        id,
+        name,
+        rating,
+        profile_picture
+      )
+    `),
+    getById: (id: string) => supabase.from('rides').select(`
+      *,
+      driver:users!driver_id (
+        id,
+        name,
+        rating,
+        profile_picture
+      )
+    `).eq('id', id).single(),
+    getByDriver: (driverId: string) => supabase.from('rides').select(`
+      *,
+      driver:users!driver_id (
+        id,
+        name,
+        rating,
+        profile_picture
+      )
+    `).eq('driver_id', driverId),
     search: (filters: any) => {
-      let query = supabase.from('rides').select('*');
+      let query = supabase.from('rides').select(`
+        *,
+        driver:users!driver_id (
+          id,
+          name,
+          rating,
+          profile_picture
+        )
+      `);
       // Add search filters here based on pickup/drop locations, time, etc.
       return query;
     },

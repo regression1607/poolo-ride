@@ -20,6 +20,8 @@ import { VehicleTypeSelector } from '../../components/ride-specific/VehicleTypeS
 import { SearchRideCard } from '../../components/ride-specific/SearchRideCard';
 import { VehicleType, Ride } from '../../types/ride';
 import { rideService } from '../../services/api/rideService';
+import { bookingService } from '../../services/api/bookingService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SearchRide {
   id: string;
@@ -37,6 +39,7 @@ interface SearchRide {
 }
 
 export const SearchScreen: React.FC = () => {
+  const { user } = useAuth();
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
   const [seatsNeeded, setSeatsNeeded] = useState(1);
@@ -45,6 +48,8 @@ export const SearchScreen: React.FC = () => {
   const [searchResults, setSearchResults] = useState<SearchRide[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [bookingRideId, setBookingRideId] = useState<string | null>(null);
+  const [userBookings, setUserBookings] = useState<string[]>([]); // Array of ride IDs that user has booked
 
   const formatDate = (date: Date) => {
     const today = new Date();
@@ -70,7 +75,7 @@ export const SearchScreen: React.FC = () => {
     
     return {
       id: ride.id,
-      driverName: ride.driver?.name || 'Driver',
+      driverName: ride.driver?.name || 'Unknown Driver',
       driverRating: ride.driver?.rating || 5.0,
       vehicleType: ride.vehicle_type,
       vehicleModel: `${ride.vehicle_type.charAt(0).toUpperCase() + ride.vehicle_type.slice(1)}`,
@@ -142,6 +147,21 @@ export const SearchScreen: React.FC = () => {
       const availableRides = await rideService.getAvailableRides();
       console.log('Available rides fetched:', availableRides.length);
 
+      // Fetch user's existing bookings if logged in
+      let bookedRideIds: string[] = [];
+      if (user?.id) {
+        try {
+          const userBookingsData = await bookingService.getBookingsByPassenger(user.id);
+          bookedRideIds = userBookingsData
+            .filter(booking => booking.booking_status === 'confirmed')
+            .map(booking => booking.ride_id);
+          console.log('User has booked rides:', bookedRideIds);
+        } catch (error) {
+          console.warn('Failed to fetch user bookings:', error);
+        }
+      }
+      setUserBookings(bookedRideIds);
+
       // Filter rides based on search criteria
       const filteredRides = filterRides(availableRides);
       console.log('Filtered rides:', filteredRides.length);
@@ -170,6 +190,84 @@ export const SearchScreen: React.FC = () => {
     }
   };
 
+  // Handle booking a ride
+  const handleBookRide = async (rideId: string, driverName: string) => {
+    if (!user?.id) {
+      Alert.alert('Authentication Required', 'Please login to book a ride.');
+      return;
+    }
+
+    try {
+      setBookingRideId(rideId);
+      
+      // Find the ride to get pricing information
+      const ride = searchResults.find(r => r.id === rideId);
+      if (!ride) {
+        throw new Error('Ride not found');
+      }
+
+      const totalPrice = ride.pricePerSeat * seatsNeeded;
+
+      console.log('=== BOOKING: Starting ride booking ===');
+      console.log('Booking details:', {
+        rideId,
+        passengerId: user.id,
+        seatsNeeded,
+        totalPrice,
+      });
+
+      // Create the booking
+      await bookingService.createBooking({
+        rideId,
+        passengerId: user.id,
+        seatsBooked: seatsNeeded,
+        totalPrice,
+      });
+
+      // Update the search results to reflect the new available seats
+      setSearchResults(prevResults => 
+        prevResults.map(result => 
+          result.id === rideId 
+            ? { ...result, availableSeats: result.availableSeats - seatsNeeded }
+            : result
+        )
+      );
+
+      // Add this ride to user's bookings
+      setUserBookings(prevBookings => [...prevBookings, rideId]);
+
+      Alert.alert(
+        'Booking Confirmed! 🎉',
+        `You have successfully booked ${seatsNeeded} seat(s) with ${driverName} for ₹${totalPrice}. The driver will contact you soon.`,
+        [
+          {
+            text: 'View My Bookings',
+            onPress: () => {
+              // TODO: Navigate to bookings screen
+              console.log('Navigate to bookings');
+            },
+          },
+          {
+            text: 'OK',
+            style: 'default',
+          },
+        ]
+      );
+
+    } catch (error) {
+      console.error('Booking error:', error);
+      
+      let errorMessage = 'Failed to book ride. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Booking Failed', errorMessage);
+    } finally {
+      setBookingRideId(null);
+    }
+  };
+
   const handleDateSelect = (days: number) => {
     const newDate = new Date();
     newDate.setDate(newDate.getDate() + days);
@@ -180,7 +278,9 @@ export const SearchScreen: React.FC = () => {
     <SearchRideCard
       ride={item}
       onPress={() => Alert.alert('Ride Selected', `Selected ride with ${item.driverName}`)}
-      onBookPress={() => Alert.alert('Book Ride', `Booking ${seatsNeeded} seat(s) with ${item.driverName}`)}
+      onBookPress={() => handleBookRide(item.id, item.driverName)}
+      isBookingInProgress={bookingRideId === item.id}
+      isAlreadyBooked={userBookings.includes(item.id)}
     />
   );
 
@@ -341,6 +441,108 @@ export const SearchScreen: React.FC = () => {
                   size="large"
                   style={styles.searchButton}
                   disabled={isLoading}
+                />
+              </View>
+
+              {/* Quick Options */}
+              <View style={styles.quickOptions}>
+                <Text style={styles.quickOptionsTitle}>Popular routes</Text>
+                <View style={styles.routeChips}>
+                  <TouchableOpacity 
+                    style={styles.routeChip}
+                    onPress={() => {
+                      setFromLocation('Connaught Place, New Delhi');
+                      setToLocation('Cyber City, Gurgaon');
+                    }}
+                  >
+                    <Text style={styles.routeChipText}>Delhi → Gurgaon</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.routeChip}
+                    onPress={() => {
+                      setFromLocation('Noida Sector 18');
+                      setToLocation('Connaught Place, New Delhi');
+                    }}
+                  >
+                    <Text style={styles.routeChipText}>Noida → Delhi</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.routeChip}
+                    onPress={() => {
+                      setFromLocation('DLF Phase 1, Gurgaon');
+                      setToLocation('Noida Sector 62');
+                    }}
+                  >
+                    <Text style={styles.routeChipText}>Gurgaon → Noida</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </LinearGradient>
+      </ImageBackground>
+    </SafeAreaView>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ImageBackground
+        source={{
+          uri: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80'
+        }}
+        style={styles.backgroundImage}
+      >
+        <LinearGradient
+          colors={['rgba(59, 130, 246, 0.8)', 'rgba(99, 102, 241, 0.6)', 'rgba(255, 255, 255, 0.95)']}
+          style={styles.gradient}
+        >
+          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <View style={styles.content}>
+              {/* Welcome Message */}
+              <View style={styles.welcomeSection}>
+                <Text style={styles.welcomeTitle}>Find your perfect ride</Text>
+                <Text style={styles.welcomeSubtitle}>
+                  Share costs, reduce traffic, make friends!
+                </Text>
+              </View>
+
+              {/* Search Form */}
+              <View style={styles.searchForm}>
+                <LocationPicker
+                  placeholder="From: Pickup location"
+                  value={fromLocation}
+                  onLocationSelect={setFromLocation}
+                  icon="radio-button-on"
+                />
+
+                <LocationPicker
+                  placeholder="To: Drop location"
+                  value={toLocation}
+                  onLocationSelect={setToLocation}
+                  icon="location"
+                />
+
+                <SeatSelector
+                  value={seatsNeeded}
+                  onChange={setSeatsNeeded}
+                  label="Seats needed"
+                  maxSeats={4}
+                />
+
+                <VehicleTypeSelector
+                  value={vehicleType}
+                  onChange={setVehicleType}
+                  label="Preferred vehicle type"
+                />
+
+                <Button
+                  title="🔍 Search Rides"
+                  onPress={handleSearch}
+                  variant="primary"
+                  size="large"
+                  style={styles.searchButton}
                 />
               </View>
 
