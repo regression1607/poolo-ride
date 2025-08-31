@@ -54,7 +54,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
 
             {/* Features Section */}
             <View style={styles.featuresSection}>
-              <Text style={styles.welcomeTitle}>Welcome to the Future of Ride Sharing</Text>
+              {/* <Text style={styles.welcomeTitle}>Welcome to the Future of Ride Sharing</Text> */}
               {/* <Text style={styles.welcomeSubtitle}>
                 Join thousands of riders saving money and reducing carbon footprint
               </Text> */}
@@ -96,7 +96,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
                   </View>
                 </View>
 
-                <View style={styles.featureItem}>
+                {/* <View style={styles.featureItem}>
                   <View style={styles.featureIcon}>
                     <Ionicons name="shield-checkmark" size={24} color={colors.primary.main} />
                   </View>
@@ -106,7 +106,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
                       Verified profiles and secure payments
                     </Text>
                   </View>
-                </View>
+                </View> */}
               </View>
             </View>
 
