@@ -277,7 +277,7 @@ export const SearchScreen: React.FC = () => {
   const renderRideCard = ({ item }: { item: SearchRide }) => (
     <SearchRideCard
       ride={item}
-      onPress={() => Alert.alert('Ride Selected', `Selected ride with ${item.driverName}`)}
+      onPress={() => {}}
       onBookPress={() => handleBookRide(item.id, item.driverName)}
       isBookingInProgress={bookingRideId === item.id}
       isAlreadyBooked={userBookings.includes(item.id)}
