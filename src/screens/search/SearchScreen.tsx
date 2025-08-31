@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { colors, spacing } from '../../theme/colors';
 import { LocationPicker } from '../../components/ride-specific/LocationPicker';
 import { Button } from '../../components/common/Button';
@@ -22,6 +24,9 @@ import { VehicleType, Ride } from '../../types/ride';
 import { rideService } from '../../services/api/rideService';
 import { bookingService } from '../../services/api/bookingService';
 import { useAuth } from '../../contexts/AuthContext';
+import { TabParamList } from '../../types/navigation';
+
+type SearchScreenNavigationProp = BottomTabNavigationProp<TabParamList, 'SearchTab'>;
 
 interface SearchRide {
   id: string;
@@ -40,6 +45,7 @@ interface SearchRide {
 
 export const SearchScreen: React.FC = () => {
   const { user } = useAuth();
+  const navigation = useNavigation<SearchScreenNavigationProp>();
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
   const [seatsNeeded, setSeatsNeeded] = useState(1);
@@ -243,8 +249,10 @@ export const SearchScreen: React.FC = () => {
           {
             text: 'View My Bookings',
             onPress: () => {
-              // TODO: Navigate to bookings screen
-              console.log('Navigate to bookings');
+              // Navigate to RidesTab with booked tab active
+              setTimeout(() => {
+                navigation.navigate('RidesTab', { initialTab: 'booked' });
+              }, 100); // Small delay to ensure smooth transition
             },
           },
           {

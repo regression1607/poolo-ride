@@ -13,7 +13,7 @@ export type AuthStackParamList = {
 export type TabParamList = {
   SearchTab: undefined;
   PublishTab: undefined;
-  RidesTab: undefined;
+  RidesTab: { initialTab?: 'published' | 'booked' } | undefined;
   InboxTab: undefined;
   ProfileTab: undefined;
 };

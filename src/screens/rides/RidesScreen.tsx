@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../theme/colors';
 import { Button } from '../../components/common/Button';
@@ -17,6 +18,9 @@ import { VehicleType, RideStatus, BookingStatus, Ride } from '../../types/ride';
 import { rideService } from '../../services/api/rideService';
 import { bookingService, RideBooking } from '../../services/api/bookingService';
 import { useAuth } from '../../contexts/AuthContext';
+import { TabParamList } from '../../types/navigation';
+
+type RidesScreenRouteProp = RouteProp<TabParamList, 'RidesTab'>;
 
 interface RideData {
   id: string;
@@ -51,7 +55,11 @@ interface BookingRequest {
 export const RidesScreen: React.FC = () => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<'published' | 'booked'>('published');
+  const route = useRoute<RidesScreenRouteProp>();
+  
+  // Get initial tab from navigation params or default to 'published'
+  const initialTab = route.params?.initialTab || 'published';
+  const [activeTab, setActiveTab] = useState<'published' | 'booked'>(initialTab);
   const [rides, setRides] = useState<RideData[]>([]);
   const [publishedRides, setPublishedRides] = useState<Ride[]>([]);
   const [bookedRides, setBookedRides] = useState<RideBooking[]>([]);
@@ -61,6 +69,13 @@ export const RidesScreen: React.FC = () => {
   useEffect(() => {
     loadRides();
   }, [user]);
+
+  // Update active tab when navigation params change
+  useEffect(() => {
+    if (route.params?.initialTab) {
+      setActiveTab(route.params.initialTab);
+    }
+  }, [route.params?.initialTab]);
 
   const loadRides = async () => {
     if (!user?.id) {
