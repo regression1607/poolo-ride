@@ -29,12 +29,16 @@ interface SearchRideCardProps {
   ride: SearchRide;
   onPress: () => void;
   onBookPress?: () => void;
+  isBookingInProgress?: boolean;
+  isAlreadyBooked?: boolean;
 }
 
 export const SearchRideCard: React.FC<SearchRideCardProps> = ({
   ride,
   onPress,
   onBookPress,
+  isBookingInProgress = false,
+  isAlreadyBooked = false,
 }) => {
   const getVehicleIcon = (type: VehicleType) => {
     switch (type) {
@@ -157,25 +161,55 @@ export const SearchRideCard: React.FC<SearchRideCardProps> = ({
 
       {/* Bottom Info */}
       <View style={styles.bottomInfo}>
-        <View style={styles.seatsInfo}>
-          <Ionicons name="people" size={16} color={colors.neutral[600]} />
-          <Text style={styles.seatsText}>
-            {ride.availableSeats} seat{ride.availableSeats !== 1 ? 's' : ''} available
-          </Text>
+        <View style={styles.leftSection}>
+          <View style={styles.seatsInfo}>
+            <Ionicons 
+              name="people" 
+              size={16} 
+              color={ride.availableSeats <= 1 ? colors.special.orange : colors.neutral[600]} 
+            />
+            <Text style={[
+              styles.seatsText,
+              ride.availableSeats <= 1 && styles.lowSeatsText
+            ]}>
+              {ride.availableSeats} seat{ride.availableSeats !== 1 ? 's' : ''} available
+              {ride.availableSeats <= 1 && ' (Almost full!)'}
+            </Text>
+          </View>
+          
+          <View style={styles.priceInfo}>
+            <Text style={styles.price}>₹{ride.pricePerSeat}</Text>
+            <Text style={styles.priceLabel}>per seat</Text>
+          </View>
         </View>
         
-        <View style={styles.priceContainer}>
-          <Text style={styles.price}>₹{ride.pricePerSeat}</Text>
-          <Text style={styles.priceLabel}>per seat</Text>
-          
-          {onBookPress && (
+        <View style={styles.rightSection}>
+          {isAlreadyBooked ? (
+            <View style={styles.bookedIndicator}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.status.success} />
+              <Text style={styles.bookedText}>Booked</Text>
+            </View>
+          ) : onBookPress && ride.availableSeats > 0 ? (
             <TouchableOpacity
-              style={styles.bookButton}
+              style={[
+                styles.bookButton,
+                isBookingInProgress && styles.bookButtonDisabled,
+              ]}
               onPress={onBookPress}
               activeOpacity={0.8}
+              disabled={isBookingInProgress}
             >
-              <Text style={styles.bookButtonText}>Book</Text>
+              <Text style={[
+                styles.bookButtonText,
+                isBookingInProgress && styles.bookButtonTextDisabled,
+              ]}>
+                {isBookingInProgress ? 'Booking...' : 'Book'}
+              </Text>
             </TouchableOpacity>
+          ) : (
+            <View style={styles.unavailableButton}>
+              <Text style={styles.unavailableText}>Full</Text>
+            </View>
           )}
         </View>
       </View>
@@ -340,10 +374,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  leftSection: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+
+  rightSection: {
+    alignItems: 'flex-end',
+  },
+
   seatsInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
 
   seatsText: {
@@ -351,10 +395,15 @@ const styles = StyleSheet.create({
     color: colors.neutral[600],
   },
 
-  priceContainer: {
+  lowSeatsText: {
+    color: colors.special.orange,
+    fontWeight: '500',
+  },
+
+  priceInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'baseline',
+    gap: spacing.xs,
   },
 
   price: {
@@ -368,17 +417,60 @@ const styles = StyleSheet.create({
     color: colors.neutral[500],
   },
 
+  bookedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.status.success + '20',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.status.success,
+  },
+
+  bookedText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.status.success,
+  },
+
   bookButton: {
     backgroundColor: colors.primary.main,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: 20,
-    marginLeft: spacing.sm,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+
+  bookButtonDisabled: {
+    backgroundColor: colors.neutral[300],
+    opacity: 0.7,
   },
 
   bookButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.neutral.white,
+  },
+
+  bookButtonTextDisabled: {
+    color: colors.neutral[500],
+  },
+
+  unavailableButton: {
+    backgroundColor: colors.neutral[200],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+
+  unavailableText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.neutral[500],
   },
 });

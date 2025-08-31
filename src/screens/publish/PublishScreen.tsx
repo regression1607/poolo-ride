@@ -64,9 +64,9 @@ export const PublishScreen: React.FC = () => {
     return Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
   };
 
-  // Generate minutes array (00-59) with validation
+  // Generate minutes array (00-59 in 5-minute intervals for better UX)
   const getMinutesArray = () => {
-    return Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+    return Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
   };
 
   // Check if selected time is valid (at least 30 minutes from now)
@@ -93,33 +93,6 @@ export const PublishScreen: React.FC = () => {
     return true;
   };
 
-  // Get valid hours based on current time
-  const getValidHours = () => {
-    const allHours = getHoursArray();
-    if (selectedDateOption === 'tomorrow') {
-      return allHours;
-    }
-    
-    // For today, filter out past hours
-    const now = new Date();
-    return allHours.filter(hour => {
-      return isTimeValid(hour, '00', selectedPeriod);
-    });
-  };
-
-  // Get valid minutes for selected hour
-  const getValidMinutes = () => {
-    const allMinutes = getMinutesArray();
-    if (selectedDateOption === 'tomorrow') {
-      return allMinutes;
-    }
-    
-    // For today, filter out past minutes for the current hour
-    return allMinutes.filter(minute => {
-      return isTimeValid(selectedHour, minute, selectedPeriod);
-    });
-  };
-
   // Convert 12-hour format to 24-hour format
   const convertTo24Hour = (hour: string, period: 'AM' | 'PM') => {
     let hourNum = parseInt(hour);
@@ -137,21 +110,24 @@ export const PublishScreen: React.FC = () => {
     return `${hour24}:${selectedMinute}`;
   };
 
-  // Update ride data with selected time and validate
-  const updateSelectedTime = () => {
+  // Update ride data with selected time (called when user finalizes selection)
+  const updateRideDataTime = () => {
     const timeString = getSelectedTime24();
-    
-    // Validate if the selected time is valid
+    updateRideData('departureTime', timeString);
+    console.log('Selected time updated:', timeString);
+  };
+
+  // Validate selected time and show error if invalid
+  const validateSelectedTime = () => {
     if (!isTimeValid(selectedHour, selectedMinute, selectedPeriod)) {
       Alert.alert(
         'Invalid Time',
-        'Please select a time that is at least 30 minutes from now.'
+        'Please select a time that is at least 30 minutes from now.',
+        [{ text: 'OK' }]
       );
-      return;
+      return false;
     }
-    
-    updateRideData('departureTime', timeString);
-    console.log('Selected time updated:', timeString);
+    return true;
   };
 
   const calculateSuggestedPrice = () => {
@@ -186,10 +162,11 @@ export const PublishScreen: React.FC = () => {
         }
         break;
       case 2:
-        if (!rideData.departureTime) {
-          Alert.alert('Missing Information', 'Please select departure time');
+        // Validate time selection and update ride data
+        if (!validateSelectedTime()) {
           return false;
         }
+        updateRideDataTime();
         break;
       case 3:
         if (!rideData.pricePerSeat || isNaN(Number(rideData.pricePerSeat))) {
@@ -297,7 +274,7 @@ export const PublishScreen: React.FC = () => {
     console.log('Selected date:', selectedDate.toDateString());
     updateRideData('departureDate', selectedDate);
     
-    // Reset time selection when date changes and set default valid time
+    // Reset time selection when date changes and set sensible defaults
     if (option === 'today') {
       // For today, set time to at least 30 minutes from now
       const now = new Date();
@@ -319,7 +296,7 @@ export const PublishScreen: React.FC = () => {
       }
       
       setSelectedHour(hour12.toString().padStart(2, '0'));
-      setSelectedMinute(Math.ceil(minute / 5) * 5 >= 60 ? '00' : (Math.ceil(minute / 5) * 5).toString().padStart(2, '0')); // Round up to next 5-minute interval
+      setSelectedMinute(Math.ceil(minute / 5) * 5 >= 60 ? '00' : (Math.ceil(minute / 5) * 5).toString().padStart(2, '0'));
       setSelectedPeriod(period);
     } else {
       // For tomorrow, set default time
@@ -328,7 +305,6 @@ export const PublishScreen: React.FC = () => {
       setSelectedPeriod('AM');
     }
     
-    updateRideData('departureTime', '');
     console.log('Time reset for new date');
   };
 
@@ -438,32 +414,23 @@ export const PublishScreen: React.FC = () => {
               style={styles.pickerScrollView}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.pickerContent}
+              nestedScrollEnabled={true}
+              scrollEnabled={true}
             >
               {getHoursArray().map((hour) => {
-                const isValid = isTimeValid(hour, selectedMinute, selectedPeriod);
-                const isDisabled = selectedDateOption === 'today' && !isValid;
-                
                 return (
                   <TouchableOpacity
                     key={hour}
                     style={[
                       styles.timePickerOption,
                       selectedHour === hour && styles.selectedTimePickerOption,
-                      isDisabled && styles.disabledTimePickerOption,
                     ]}
-                    onPress={() => {
-                      if (!isDisabled) {
-                        setSelectedHour(hour);
-                        updateSelectedTime();
-                      }
-                    }}
-                    disabled={isDisabled}
+                    onPress={() => setSelectedHour(hour)}
                   >
                     <Text
                       style={[
                         styles.timePickerOptionText,
                         selectedHour === hour && styles.selectedTimePickerOptionText,
-                        isDisabled && styles.disabledTimePickerOptionText,
                       ]}
                     >
                       {hour}
@@ -481,32 +448,23 @@ export const PublishScreen: React.FC = () => {
               style={styles.pickerScrollView}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.pickerContent}
+              nestedScrollEnabled={true}
+              scrollEnabled={true}
             >
               {getMinutesArray().map((minute) => {
-                const isValid = isTimeValid(selectedHour, minute, selectedPeriod);
-                const isDisabled = selectedDateOption === 'today' && !isValid;
-                
                 return (
                   <TouchableOpacity
                     key={minute}
                     style={[
                       styles.timePickerOption,
                       selectedMinute === minute && styles.selectedTimePickerOption,
-                      isDisabled && styles.disabledTimePickerOption,
                     ]}
-                    onPress={() => {
-                      if (!isDisabled) {
-                        setSelectedMinute(minute);
-                        updateSelectedTime();
-                      }
-                    }}
-                    disabled={isDisabled}
+                    onPress={() => setSelectedMinute(minute)}
                   >
                     <Text
                       style={[
                         styles.timePickerOptionText,
                         selectedMinute === minute && styles.selectedTimePickerOptionText,
-                        isDisabled && styles.disabledTimePickerOptionText,
                       ]}
                     >
                       {minute}
@@ -528,10 +486,7 @@ export const PublishScreen: React.FC = () => {
                     styles.periodPickerOption,
                     selectedPeriod === period && styles.selectedPeriodPickerOption,
                   ]}
-                  onPress={() => {
-                    setSelectedPeriod(period as 'AM' | 'PM');
-                    updateSelectedTime();
-                  }}
+                  onPress={() => setSelectedPeriod(period as 'AM' | 'PM')}
                 >
                   <Text
                     style={[
@@ -550,9 +505,17 @@ export const PublishScreen: React.FC = () => {
         {/* Selected Time Display */}
         <View style={styles.selectedTimeDisplay}>
           <Text style={styles.selectedTimeLabel}>Selected Time:</Text>
-          <Text style={styles.selectedTimeValue}>
+          <Text style={[
+            styles.selectedTimeValue,
+            selectedDateOption === 'today' && !isTimeValid(selectedHour, selectedMinute, selectedPeriod) && styles.invalidTimeValue
+          ]}>
             {selectedHour}:{selectedMinute} {selectedPeriod}
           </Text>
+          {selectedDateOption === 'today' && !isTimeValid(selectedHour, selectedMinute, selectedPeriod) && (
+            <Text style={styles.invalidTimeWarning}>
+              ⚠️ This time is too soon. Please select a time at least 30 minutes from now.
+            </Text>
+          )}
         </View>
       </View>
     </View>
@@ -1096,6 +1059,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
     marginTop: spacing.md,
+    height: 150, // Fixed height for consistent layout
   },
 
   timePickerSection: {
@@ -1111,7 +1075,7 @@ const styles = StyleSheet.create({
   },
 
   pickerWrapper: {
-    maxHeight: 120,
+    height: 120,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.neutral[300],
@@ -1119,23 +1083,26 @@ const styles = StyleSheet.create({
   },
 
   pickerScrollView: {
-    maxHeight: 120,
+    height: 120,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.neutral[300],
     backgroundColor: colors.neutral.white,
+    overflow: 'hidden',
   },
 
   pickerContent: {
-    flexGrow: 1,
+    paddingVertical: spacing.xs,
   },
 
   timePickerOption: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.neutral[200],
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
     minWidth: 60,
   },
 
@@ -1153,6 +1120,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.neutral[700],
     fontWeight: '500',
+    textAlign: 'center',
   },
 
   selectedTimePickerOptionText: {
@@ -1165,18 +1133,22 @@ const styles = StyleSheet.create({
   },
 
   periodPickerWrapper: {
+    height: 120,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.neutral[300],
     backgroundColor: colors.neutral.white,
     overflow: 'hidden',
+    justifyContent: 'space-around',
   },
 
   periodPickerOption: {
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
+    justifyContent: 'center',
     minWidth: 60,
+    flex: 1,
     borderBottomWidth: 1,
     borderBottomColor: colors.neutral[200],
   },
@@ -1215,5 +1187,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.primary.main,
+  },
+
+  invalidTimeValue: {
+    color: colors.status.error,
+  },
+
+  invalidTimeWarning: {
+    fontSize: 12,
+    color: colors.status.error,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });

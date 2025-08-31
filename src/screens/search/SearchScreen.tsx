@@ -18,7 +18,10 @@ import { Button } from '../../components/common/Button';
 import { SeatSelector } from '../../components/ride-specific/SeatSelector';
 import { VehicleTypeSelector } from '../../components/ride-specific/VehicleTypeSelector';
 import { SearchRideCard } from '../../components/ride-specific/SearchRideCard';
-import { VehicleType } from '../../types/ride';
+import { VehicleType, Ride } from '../../types/ride';
+import { rideService } from '../../services/api/rideService';
+import { bookingService } from '../../services/api/bookingService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SearchRide {
   id: string;
@@ -36,6 +39,7 @@ interface SearchRide {
 }
 
 export const SearchScreen: React.FC = () => {
+  const { user } = useAuth();
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
   const [seatsNeeded, setSeatsNeeded] = useState(1);
@@ -44,6 +48,8 @@ export const SearchScreen: React.FC = () => {
   const [searchResults, setSearchResults] = useState<SearchRide[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [bookingRideId, setBookingRideId] = useState<string | null>(null);
+  const [userBookings, setUserBookings] = useState<string[]>([]); // Array of ride IDs that user has booked
 
   const formatDate = (date: Date) => {
     const today = new Date();
@@ -63,20 +69,203 @@ export const SearchScreen: React.FC = () => {
     }
   };
 
-  const handleSearch = () => {
+  // Convert Ride to SearchRide format for display
+  const convertRideToSearchRide = (ride: Ride): SearchRide => {
+    const departureDate = new Date(ride.pickup_time);
+    
+    return {
+      id: ride.id,
+      driverName: ride.driver?.name || 'Unknown Driver',
+      driverRating: ride.driver?.rating || 5.0,
+      vehicleType: ride.vehicle_type,
+      vehicleModel: `${ride.vehicle_type.charAt(0).toUpperCase() + ride.vehicle_type.slice(1)}`,
+      departureTime: departureDate.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }),
+      pickupLocation: ride.pickup_address,
+      dropLocation: ride.drop_address,
+      availableSeats: ride.available_seats,
+      pricePerSeat: ride.price_per_seat,
+      estimatedDuration: '45 mins', // Default duration - in real app, calculate from distance
+      driverImage: ride.driver?.profile_picture_url,
+    };
+  };
+
+  // Filter rides based on search criteria
+  const filterRides = (rides: Ride[]): Ride[] => {
+    return rides.filter(ride => {
+      // Check if ride has enough available seats
+      if (ride.available_seats < seatsNeeded) {
+        return false;
+      }
+
+      // Check vehicle type preference (optional filter)
+      if (vehicleType && vehicleType !== 'car' && ride.vehicle_type !== vehicleType) {
+        return false;
+      }
+
+      // Check location matching (basic string matching)
+      const pickupMatch = fromLocation === '' || 
+        ride.pickup_address.toLowerCase().includes(fromLocation.toLowerCase()) ||
+        fromLocation.toLowerCase().includes(ride.pickup_address.toLowerCase());
+      
+      const dropMatch = toLocation === '' || 
+        ride.drop_address.toLowerCase().includes(toLocation.toLowerCase()) ||
+        toLocation.toLowerCase().includes(ride.drop_address.toLowerCase());
+
+      // Check date matching
+      const rideDate = new Date(ride.pickup_time);
+      const searchDate = selectedDate;
+      
+      // Compare dates (same day)
+      const dateMatch = rideDate.toDateString() === searchDate.toDateString();
+
+      return pickupMatch && dropMatch && dateMatch;
+    });
+  };
+
+  const handleSearch = async () => {
     if (!fromLocation || !toLocation) {
       Alert.alert('Missing Information', 'Please select both pickup and drop locations');
       return;
     }
 
-    setIsLoading(true);
-    
-    // TODO: Replace with actual API call to search for rides
-    setTimeout(() => {
-      setSearchResults([]); // Start with empty results - no mock data
+    try {
+      setIsLoading(true);
+      console.log('=== SEARCH SCREEN: Starting ride search ===');
+      console.log('Search criteria:', {
+        fromLocation,
+        toLocation,
+        seatsNeeded,
+        vehicleType,
+        selectedDate: selectedDate.toDateString(),
+      });
+
+      // Fetch all available rides from the service
+      const availableRides = await rideService.getAvailableRides();
+      console.log('Available rides fetched:', availableRides.length);
+
+      // Fetch user's existing bookings if logged in
+      let bookedRideIds: string[] = [];
+      if (user?.id) {
+        try {
+          const userBookingsData = await bookingService.getBookingsByPassenger(user.id);
+          bookedRideIds = userBookingsData
+            .filter(booking => booking.booking_status === 'confirmed')
+            .map(booking => booking.ride_id);
+          console.log('User has booked rides:', bookedRideIds);
+        } catch (error) {
+          console.warn('Failed to fetch user bookings:', error);
+        }
+      }
+      setUserBookings(bookedRideIds);
+
+      // Filter rides based on search criteria
+      const filteredRides = filterRides(availableRides);
+      console.log('Filtered rides:', filteredRides.length);
+
+      // Convert to SearchRide format for display
+      const searchRideResults = filteredRides.map(convertRideToSearchRide);
+      
+      setSearchResults(searchRideResults);
       setShowResults(true);
+      
+      console.log('Search completed, showing', searchRideResults.length, 'results');
+
+    } catch (error) {
+      console.error('Search error:', error);
+      
+      let errorMessage = 'Failed to search for rides. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Search Failed', errorMessage);
+      setSearchResults([]);
+      setShowResults(true);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
+  };
+
+  // Handle booking a ride
+  const handleBookRide = async (rideId: string, driverName: string) => {
+    if (!user?.id) {
+      Alert.alert('Authentication Required', 'Please login to book a ride.');
+      return;
+    }
+
+    try {
+      setBookingRideId(rideId);
+      
+      // Find the ride to get pricing information
+      const ride = searchResults.find(r => r.id === rideId);
+      if (!ride) {
+        throw new Error('Ride not found');
+      }
+
+      const totalPrice = ride.pricePerSeat * seatsNeeded;
+
+      console.log('=== BOOKING: Starting ride booking ===');
+      console.log('Booking details:', {
+        rideId,
+        passengerId: user.id,
+        seatsNeeded,
+        totalPrice,
+      });
+
+      // Create the booking
+      await bookingService.createBooking({
+        rideId,
+        passengerId: user.id,
+        seatsBooked: seatsNeeded,
+        totalPrice,
+      });
+
+      // Update the search results to reflect the new available seats
+      setSearchResults(prevResults => 
+        prevResults.map(result => 
+          result.id === rideId 
+            ? { ...result, availableSeats: result.availableSeats - seatsNeeded }
+            : result
+        )
+      );
+
+      // Add this ride to user's bookings
+      setUserBookings(prevBookings => [...prevBookings, rideId]);
+
+      Alert.alert(
+        'Booking Confirmed! 🎉',
+        `You have successfully booked ${seatsNeeded} seat(s) with ${driverName} for ₹${totalPrice}. The driver will contact you soon.`,
+        [
+          {
+            text: 'View My Bookings',
+            onPress: () => {
+              // TODO: Navigate to bookings screen
+              console.log('Navigate to bookings');
+            },
+          },
+          {
+            text: 'OK',
+            style: 'default',
+          },
+        ]
+      );
+
+    } catch (error) {
+      console.error('Booking error:', error);
+      
+      let errorMessage = 'Failed to book ride. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Booking Failed', errorMessage);
+    } finally {
+      setBookingRideId(null);
+    }
   };
 
   const handleDateSelect = (days: number) => {
@@ -88,8 +277,10 @@ export const SearchScreen: React.FC = () => {
   const renderRideCard = ({ item }: { item: SearchRide }) => (
     <SearchRideCard
       ride={item}
-      onPress={() => Alert.alert('Ride Selected', `Selected ride with ${item.driverName}`)}
-      onBookPress={() => Alert.alert('Book Ride', `Booking ${seatsNeeded} seat(s) with ${item.driverName}`)}
+      onPress={() => {}}
+      onBookPress={() => handleBookRide(item.id, item.driverName)}
+      isBookingInProgress={bookingRideId === item.id}
+      isAlreadyBooked={userBookings.includes(item.id)}
     />
   );
 
