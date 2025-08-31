@@ -102,7 +102,7 @@ export const TabNavigator: React.FC = () => {
         options={{
           title: 'Inbox',
           headerTitle: '💬 Messages',
-          headerShown: false,
+          headerShown: true,
         }}
       />
       <Tab.Screen
