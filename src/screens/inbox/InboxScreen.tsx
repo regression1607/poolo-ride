@@ -13,6 +13,8 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
 import { colors, spacing } from '../../theme/colors';
 import { messageService, RideMessage } from '../../services/api/messageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -44,6 +46,7 @@ interface ChatConversation {
 
 export const InboxScreen: React.FC = () => {
   const { user } = useAuth();
+  const navigation = useNavigation();
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [selectedChat, setSelectedChat] = useState<ChatConversation | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -187,6 +190,18 @@ export const InboxScreen: React.FC = () => {
     }
   };
 
+  const handleViewRide = () => {
+    if (selectedChatId) {
+      // Extract ride ID from the conversation ID
+      const [rideId] = selectedChatId.split('___');
+      
+      // Navigate to RidesTab with published tab focused
+      (navigation as any).navigate('RidesTab', { 
+        initialTab: 'published'
+      });
+    }
+  };
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
@@ -326,7 +341,7 @@ export const InboxScreen: React.FC = () => {
             {selectedChat?.rideInfo.date} at {selectedChat?.rideInfo.time}
           </Text>
         </View>
-        <TouchableOpacity style={styles.viewRideButton}>
+        <TouchableOpacity style={styles.viewRideButton} onPress={handleViewRide}>
           <Text style={styles.viewRideText}>View Ride</Text>
         </TouchableOpacity>
       </View>
