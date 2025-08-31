@@ -90,6 +90,12 @@ export const db = {
         )
       )
     `).eq('passenger_id', passengerId),
+    getByRideAndPassenger: (rideId: string, passengerId: string) => supabase
+      .from('ride_bookings')
+      .select('*')
+      .eq('ride_id', rideId)
+      .eq('passenger_id', passengerId)
+      .single(),
     update: (id: string, updates: any) => supabase.from('ride_bookings').update(updates).eq('id', id).select(),
   },
   

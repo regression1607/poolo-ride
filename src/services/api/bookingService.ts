@@ -62,19 +62,50 @@ class BookingService {
       }
 
       // Check if user already has a booking for this ride
-      const { data: existingBooking, error: checkError } = await db.bookings.getByRide(bookingData.rideId);
+      console.log('Checking for existing booking for ride:', bookingData.rideId, 'passenger:', bookingData.passengerId);
+      const { data: existingBooking, error: checkError } = await db.bookings.getByRideAndPassenger(bookingData.rideId, bookingData.passengerId);
       
-      if (checkError) {
-        console.warn('Error checking existing bookings:', checkError);
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error, which is expected
+        console.warn('Error checking existing booking:', checkError);
+        throw new Error(`Failed to check existing booking: ${checkError.message}`);
       }
 
-      const userHasBooking = existingBooking?.some(
-        (booking: any) => booking.passenger_id === bookingData.passengerId && 
-        booking.booking_status !== 'cancelled'
-      );
+      if (existingBooking) {
+        console.log('Found existing booking:', existingBooking);
+        
+        if (existingBooking.booking_status === 'cancelled') {
+          // Update existing cancelled booking to confirmed
+          console.log('Found cancelled booking, updating to confirmed:', existingBooking.id);
+          
+          const updateData = {
+            seats_booked: bookingData.seatsBooked,
+            total_price: bookingData.totalPrice,
+            booking_status: 'confirmed' as const,
+            booked_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
 
-      if (userHasBooking) {
-        throw new Error('You already have a booking for this ride');
+          const { data: updatedData, error: updateError } = await db.bookings.update(existingBooking.id, updateData);
+          
+          if (updateError) {
+            console.error('Database update error:', updateError);
+            throw new Error(`Failed to update booking: ${updateError.message}`);
+          }
+
+          if (!updatedData) {
+            throw new Error('No data returned from booking update');
+          }
+
+          const updatedBooking = Array.isArray(updatedData) ? updatedData[0] : updatedData;
+          console.log('Booking updated successfully:', updatedBooking);
+          return updatedBooking as RideBooking;
+        } else {
+          // Booking already exists and is not cancelled
+          console.log('Booking already exists with status:', existingBooking.booking_status);
+          throw new Error('You already have an active booking for this ride');
+        }
+      } else {
+        console.log('No existing booking found, creating new one');
       }
 
       // Create the booking with confirmed status
@@ -84,6 +115,8 @@ class BookingService {
         seats_booked: bookingData.seatsBooked,
         total_price: bookingData.totalPrice,
         booking_status: 'confirmed' as const,
+        booked_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
 
       const { data, error } = await db.bookings.create(bookingRequest);
